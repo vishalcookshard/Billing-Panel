@@ -161,6 +161,15 @@ install_billing_panel() {
   
   # Clone repo with retries
   info "Cloning repository..."
+  
+  # Ensure parent directory exists
+  local parent_dir=$(dirname "$INSTALL_DIR")
+  if [[ ! -d "$parent_dir" ]]; then
+    info "Creating directory $parent_dir..."
+    mkdir -p "$parent_dir" || error_exit "Failed to create $parent_dir. Check permissions."
+  fi
+  
+  # Remove existing installation if present
   [[ -d "$INSTALL_DIR" ]] && rm -rf "$INSTALL_DIR"
   
   local clone_success=0
@@ -189,7 +198,7 @@ install_billing_panel() {
     error_exit "Repository clone failed. Directory $INSTALL_DIR not created."
   fi
   
-  cd "$INSTALL_DIR"
+  cd "$INSTALL_DIR" || error_exit "Failed to change to $INSTALL_DIR"
   success "Repository cloned to $INSTALL_DIR"
   
   # Create .env
