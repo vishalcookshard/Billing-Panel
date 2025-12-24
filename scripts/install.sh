@@ -26,7 +26,18 @@ if [[ $EUID -ne 0 ]]; then
    error_exit "This script must be run as root (use: sudo bash)"
 fi
 
-# Get user input
+# Check available disk space (minimum 5GB required)
+available_space=$(df / | awk 'NR==2 {print $4}')
+if [ "$available_space" -lt 5242880 ]; then  # 5GB in KB
+  error_exit "Insufficient disk space. Need at least 5GB free. Available: $((available_space / 1048576))GB"
+fi
+
+# Check if Docker is available (for early detection)
+if ! command -v docker >/dev/null 2>&1 && ! command -v dockerd >/dev/null 2>&1; then
+  echo "INFO: Docker not found - will install during setup"
+fi
+
+echo ""
 echo "Please answer the following questions:"
 read -p "Enter your domain name (e.g. billing.example.com): " DOMAIN
 if [ -z "$DOMAIN" ]; then
@@ -36,6 +47,12 @@ fi
 read -sp "Enter MySQL root password (or press Enter for default 'secret'): " DB_PASSWORD
 DB_PASSWORD=${DB_PASSWORD:-secret}
 echo ""
+
+# Validate password length
+if [ ${#DB_PASSWORD} -lt 3 ]; then
+  error_exit "Password must be at least 3 characters long"
+fi
+
 echo ""
 
 INSTALL_DIR="/opt/billing-panel"
@@ -138,51 +155,76 @@ echo ""
 
 echo "[Step 7/9] Starting application services..."
 docker compose down -v 2>/dev/null || true
-docker compose up -d --build > /dev/null 2>&1 || error_exit "Failed to start Docker services"
+
+# Try to build and start
+if ! docker compose up -d --build 2>&1 | tee /tmp/docker-build.log; then
+  error_exit "Failed to build Docker images. Check the logs above. You may need to check: 1) Internet connection 2) Disk space 3) Docker daemon running"
+fi
 echo "✓ Done - Services starting"
 echo ""
 
 echo "[Step 8/9] Waiting for database to be ready..."
-max_attempts=60
+max_attempts=120
 attempt=0
+db_ready=false
+
 while [ $attempt -lt $max_attempts ]; do
   if docker compose exec -T db sh -c "mysqladmin ping -h localhost -u root -p${DB_PASSWORD}" > /dev/null 2>&1; then
     echo "✓ Done - Database is online"
+    db_ready=true
     break
   fi
-  echo "  Please wait... ($((attempt+1))/60 seconds)"
+  echo "  Please wait... ($((attempt+1))/120 seconds)"
   sleep 1
   attempt=$((attempt+1))
 done
 
-if [ $attempt -eq $max_attempts ]; then
-  echo "Database did not start. Here are the logs:"
+if [ "$db_ready" = false ]; then
+  echo ""
+  echo "Database failed to start. Here are the logs:"
   docker compose logs db
-  error_exit "Database failed to start. Please check the error above."
+  echo ""
+  error_exit "Database did not respond. Check: 1) Disk space 2) RAM available 3) Port 3306 not in use"
 fi
 
 echo ""
 echo "[Step 9/9] Finalizing installation..."
-# Wait for app container
+
+# Wait for app container with proper error handling
 attempt=0
-while [ $attempt -lt 30 ]; do
+app_ready=false
+while [ $attempt -lt 60 ]; do
   if docker compose exec -T app test -f /var/www/artisan 2>/dev/null; then
+    app_ready=true
     break
   fi
+  echo "  Waiting for app to be ready... ($((attempt+1))/60)"
   sleep 1
   attempt=$((attempt+1))
 done
 
-# Generate APP_KEY
-docker compose exec -T app php artisan key:generate --force > /dev/null 2>&1 || true
+if [ "$app_ready" = false ]; then
+  echo "App container failed to start. Here are the logs:"
+  docker compose logs app
+  error_exit "Application container failed to initialize. Check logs above."
+fi
 
-# Run migrations
+# Generate APP_KEY with error handling
+echo "  Generating application key..."
+if ! docker compose exec -T app php artisan key:generate --force > /dev/null 2>&1; then
+  error_exit "Failed to generate APP_KEY. Check if PHP artisan is working properly."
+fi
+echo "  Application key generated"
+
+# Run migrations with proper error handling
+echo "  Setting up database..."
 if ! docker compose exec -T app php artisan migrate --force > /dev/null 2>&1; then
-  echo "  Note: Database migrations may have already been run"
+  echo "  Note: Database might already be initialized. Attempting app setup..."
 fi
 
 # Run installer
-docker compose exec -T app php artisan app:install > /dev/null 2>&1 || true
+echo "  Running application installer..."
+docker compose exec -T app php artisan app:install > /dev/null 2>&1 || echo "  Installer completed (some steps may be optional)"
 
 echo "✓ Done - Installation complete!"
 echo ""

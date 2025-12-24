@@ -36,7 +36,8 @@ RUN composer install \
     --no-dev \
     --optimize-autoloader \
     --no-interaction \
-    --no-progress
+    --no-progress \
+    2>&1 || (echo "ERROR: Composer install failed. Check internet connection and PHP version requirements." && exit 1)
 
 COPY . /var/www
 
