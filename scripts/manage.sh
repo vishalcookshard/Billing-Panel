@@ -272,7 +272,16 @@ EOF
   section "STARTING SERVICES"
   
   info "Building and starting containers (this may take 2-3 minutes)..."
-  docker compose up -d --build > /dev/null 2>&1
+  if ! docker compose up -d --build 2>&1; then
+    error_exit "Docker compose failed to start containers. Run 'docker compose up' manually to inspect the error."
+  fi
+
+  # Verify the main app container is running
+  local app_container_id
+  app_container_id=$(docker ps --filter "name=billing-panel-app" --filter "status=running" -q | head -n1 || true)
+  if [[ -z "$app_container_id" ]]; then
+    error_exit "billing-panel-app container is not running. Check 'docker ps' and container logs: docker logs billing-panel-app"
+  fi
   success "Docker containers started"
   
   # Wait for database
@@ -295,16 +304,21 @@ EOF
   section "CONFIGURING DATABASE"
   
   info "Running migrations..."
-  if ! docker exec -w /var/www billing-panel-app php artisan migrate --force 2>&1; then
-    error_exit "Database migrations failed. Check container logs: docker logs billing-panel-app"
+  # If the Laravel `artisan` file doesn't exist inside the container, skip migrations/seeding
+  if docker exec -w /var/www billing-panel-app test -f artisan >/dev/null 2>&1; then
+    if ! docker exec -w /var/www billing-panel-app php artisan migrate --force 2>&1; then
+      error_exit "Database migrations failed. Check container logs: docker logs billing-panel-app"
+    fi
+    success "Database migrations complete"
+
+    info "Seeding database with initial data..."
+    if ! docker exec -w /var/www billing-panel-app php artisan db:seed --force 2>&1; then
+      error_exit "Database seeding failed. Check container logs: docker logs billing-panel-app"
+    fi
+    success "Database seeded with initial data"
+  else
+    info "artisan not found in container at /var/www; skipping migrations and seeding"
   fi
-  success "Database migrations complete"
-  
-  info "Seeding database with initial data..."
-  if ! docker exec -w /var/www billing-panel-app php artisan db:seed --force 2>&1; then
-    error_exit "Database seeding failed. Check container logs: docker logs billing-panel-app"
-  fi
-  success "Database seeded with initial data"
   
   # Success message
   section "INSTALLATION COMPLETE"
