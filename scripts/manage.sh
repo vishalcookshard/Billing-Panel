@@ -268,6 +268,16 @@ $domain {
 }
 EOF
   success "Web server configured"
+
+  # If Laravel app files (artisan) are missing, attempt to create a new Laravel project
+  if [[ ! -f "artisan" ]]; then
+    info "No Laravel application detected. Attempting to create a new Laravel project using Composer (this requires internet access)..."
+    if ! docker run --rm -v "$INSTALL_DIR":/app -w /app composer:2 create-project laravel/laravel /app --prefer-dist --no-interaction 2>&1; then
+      info "Composer create-project failed or network unavailable. The installer will continue, but migrations will be skipped."
+    else
+      success "Laravel application scaffolded successfully"
+    fi
+  fi
   
   section "STARTING SERVICES"
   
@@ -283,6 +293,30 @@ EOF
     error_exit "billing-panel-app container is not running. Check 'docker ps' and container logs: docker logs billing-panel-app"
   fi
   success "Docker containers started"
+
+  # Ensure PHP dependencies are installed inside the app container (if composer.json exists)
+  info "Ensuring PHP dependencies are installed in container..."
+  if docker exec -w /var/www billing-panel-app test -f composer.json >/dev/null 2>&1; then
+    if ! docker exec -w /var/www billing-panel-app composer install --no-dev --optimize-autoloader --no-interaction 2>&1; then
+      info "Composer install failed inside container; proceeding but the app may be incomplete"
+    else
+      success "PHP dependencies installed"
+    fi
+  else
+    info "No composer.json found in /var/www; skipping composer install"
+  fi
+
+  # Set correct permissions for Laravel storage and cache
+  info "Setting filesystem permissions..."
+  docker exec -w /var/www billing-panel-app sh -c "chown -R www-data:www-data storage bootstrap/cache || true"
+  docker exec -w /var/www billing-panel-app sh -c "chmod -R 775 storage bootstrap/cache || true"
+  success "Filesystem permissions set"
+
+  # Generate application key if artisan exists
+  if docker exec -w /var/www billing-panel-app test -f artisan >/dev/null 2>&1; then
+    info "Generating application key..."
+    docker exec -w /var/www billing-panel-app php artisan key:generate --force || info "artisan key:generate failed"
+  fi
   
   # Wait for database
   info "Waiting for database..."
