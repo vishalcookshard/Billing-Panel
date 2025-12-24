@@ -159,15 +159,34 @@ install_billing_panel() {
   
   section "SETTING UP APPLICATION"
   
-  # Clone repo
+  # Clone repo with retries
   info "Cloning repository..."
   [[ -d "$INSTALL_DIR" ]] && rm -rf "$INSTALL_DIR"
-  if ! git clone -b "$REPO_BRANCH" "$REPO_URL" "$INSTALL_DIR" > /dev/null 2>&1; then
-    error_exit "Failed to clone repository from $REPO_URL. Check your internet connection."
+  
+  local clone_success=0
+  local max_retries=3
+  local retry=0
+  
+  while [ $retry -lt $max_retries ]; do
+    local git_output
+    if git_output=$(git clone -b "$REPO_BRANCH" "$REPO_URL" "$INSTALL_DIR" 2>&1); then
+      clone_success=1
+      break
+    else
+      retry=$((retry + 1))
+      if [ $retry -lt $max_retries ]; then
+        info "Clone attempt $retry failed, retrying in 5 seconds..."
+        sleep 5
+      fi
+    fi
+  done
+  
+  if [ $clone_success -eq 0 ]; then
+    error_exit "Failed to clone repository after $max_retries attempts. Check internet connectivity:\n$git_output"
   fi
   
   if [[ ! -d "$INSTALL_DIR" ]] || [[ ! -f "$INSTALL_DIR/Caddyfile" ]]; then
-    error_exit "Repository clone incomplete. Caddyfile not found."
+    error_exit "Repository clone incomplete. Caddyfile not found in $INSTALL_DIR. Verify the repository contains this file."
   fi
   
   cd "$INSTALL_DIR"
