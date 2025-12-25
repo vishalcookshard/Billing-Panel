@@ -55,7 +55,7 @@ COPY resources/ resources/
 COPY routes/ routes/
 COPY public/ public/
 COPY composer.json composer.json
-COPY composer.lock composer.lock*
+# Do not copy composer.lock (it may not exist)
 COPY .env.example .env.example
 COPY scripts/ scripts/
 COPY Dockerfile Dockerfile
