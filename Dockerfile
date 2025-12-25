@@ -43,23 +43,10 @@ COPY composer.json composer.lock* ./
 
 
 
-# Copy our application files into the Laravel skeleton (preserve vendor)
-# Selective copy to avoid overwriting Laravel core files like vendor/ and node_modules/
-COPY app/ app/
-COPY bootstrap/ bootstrap/
-COPY config/ config/
-COPY database/ database/
-COPY resources/ resources/
-COPY routes/ routes/
-COPY public/ public/
-COPY composer.json composer.json
-# Do not copy composer.lock (it may not exist)
-COPY .env.example .env.example
-COPY scripts/ scripts/
-COPY Dockerfile Dockerfile
-COPY vite.config.js vite.config.js
+# Copy the entire Laravel application (including artisan) before composer install
+COPY . /var/www
 
-# Install composer dependencies (for existing Laravel project)
+# Install composer dependencies (after artisan exists)
 RUN composer install \
     --no-dev \
     --optimize-autoloader \
