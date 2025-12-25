@@ -53,6 +53,5 @@ EXPOSE 9000
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
     CMD php -v || exit 1
 
-# Entrypoint and CMD
+# Entrypoint only (php-fpm is run by entrypoint script)
 ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
-CMD ["php-fpm"]
