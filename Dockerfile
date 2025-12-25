@@ -1,6 +1,7 @@
 
 
-# Use a PHP image with OpenSSL 1.1.1 compatibility
+
+# Use official PHP 8.2 FPM image (includes php-fpm and all extensions)
 FROM php:8.2-fpm-bullseye
 
 # Install system dependencies and OpenSSL 1.1 compatibility
@@ -15,7 +16,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     zip \
     ca-certificates \
     openssl \
-    php8.2-fpm \
     && rm -rf /var/lib/apt/lists/*
 
 # Install PHP extensions

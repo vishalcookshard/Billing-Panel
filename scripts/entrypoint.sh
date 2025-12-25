@@ -43,5 +43,5 @@ if [ "${APP_ENV:-}" != "testing" ]; then
   php artisan migrate --force || log "Migrations failed, continuing startup."
 fi
 
-log "Startup complete, launching php-fpm8.2 in foreground"
-exec php-fpm8.2
+log "Startup complete, launching php-fpm in foreground"
+exec php-fpm
