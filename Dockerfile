@@ -41,9 +41,7 @@ COPY composer.json composer.lock* ./
 
 
 
-# Create a fresh Laravel application skeleton before merging project files
-# This ensures the framework, core service providers and expected structure exist
-RUN composer create-project laravel/laravel . --no-interaction --prefer-dist --stability=stable
+
 
 # Copy our application files into the Laravel skeleton (preserve vendor)
 # Selective copy to avoid overwriting Laravel core files like vendor/ and node_modules/
@@ -61,7 +59,7 @@ COPY scripts/ scripts/
 COPY Dockerfile Dockerfile
 COPY vite.config.js vite.config.js
 
-# Install composer dependencies (merge project's composer requirements)
+# Install composer dependencies (for existing Laravel project)
 RUN composer install \
     --no-dev \
     --optimize-autoloader \
