@@ -1,0 +1,37 @@
+#!/usr/bin/env php
+<?php
+
+define('LARAVEL_START', microtime(true));
+
+// Symfony's Process class requires the following constant to be defined
+// when it processes commands through the system shell. We define it here
+// so that you don't have to define it in the bootstrap files.
+if (! defined('STDIN')) {
+    define('STDIN', fopen('php://stdin', 'r'));
+}
+
+$dir = __DIR__;
+
+// If the file is a symbolic link, we need to resolve it.
+while (is_link($dir)) {
+    $dir = dirname($dir.'/'.readlink($dir));
+}
+
+// We'll use Composer's autoloader to properly load everything up.
+require_once $dir.'/vendor/autoload.php';
+
+$app = require_once $dir.'/bootstrap/app.php';
+
+// Now, we will only worry about running the console application if we are
+// trying to invoke it from the command line. Otherwise, we will just bail
+// without doing anything. We'll use the exit code of a command for exits.
+if (! defined('ARTISAN_BINARY')) {
+    define('ARTISAN_BINARY', 'artisan');
+}
+
+$status = (int) $app->make(\Illuminate\Contracts\Console\Kernel::class)->handle(
+    $input = new \Symfony\Component\Console\Input\ArgvInput,
+    new \Symfony\Component\Console\Output\ConsoleOutput,
+);
+
+exit($status);

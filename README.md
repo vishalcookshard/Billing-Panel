@@ -2,6 +2,12 @@
 
 A modern, production-ready billing and hosting management system built with Laravel. Perfect for hosting providers, SaaS companies, and digital service businesses.
 
+## 🚀 One-Line Installation (VM/Server)
+
+```bash
+curl -sSL https://raw.githubusercontent.com/isthisvishal/Billing-Panel/main/install.sh | bash
+```
+
 ## ✨ Features
 
 ### Frontend
