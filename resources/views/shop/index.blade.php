@@ -21,7 +21,7 @@
                         <div class="card-body">
                             @if($category->icon)
                                 <div style="font-size: 3rem; margin-bottom: 15px;">
-                                    {!! $category->icon !!}
+                                    {!! $category->icon_safe !!}
                                 </div>
                             @else
                                 <i class="fas fa-cube" style="font-size: 3rem; color: var(--primary); margin-bottom: 15px;"></i>

@@ -33,7 +33,7 @@ class PageController extends Controller
         $validated = $request->validate([
             'title' => 'required|string|max:255',
             'slug' => 'required|string|max:255|unique:pages',
-            'content' => 'required|string',
+            'content' => ['required','string', new \App\Rules\SafeHtml()],
             'is_published' => 'boolean',
             'meta_description' => 'nullable|string|max:255',
             'meta_keywords' => 'nullable|string|max:255',
@@ -64,7 +64,7 @@ class PageController extends Controller
         $validated = $request->validate([
             'title' => 'required|string|max:255',
             'slug' => 'required|string|max:255|unique:pages,slug,' . $page->id,
-            'content' => 'required|string',
+            'content' => ['required','string', new \App\Rules\SafeHtml()],
             'is_published' => 'boolean',
             'meta_description' => 'nullable|string|max:255',
             'meta_keywords' => 'nullable|string|max:255',

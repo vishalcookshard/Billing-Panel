@@ -26,6 +26,28 @@ class ServiceCategory extends Model
         'updated_at' => 'datetime',
     ];
 
+    // Sanitize icon on set and expose a safe accessor
+    public function setIconAttribute($value)
+    {
+        if (is_null($value)) {
+            $this->attributes['icon'] = null;
+            return;
+        }
+
+        if (function_exists('purify') || class_exists('\Mews\Purifier\Facades\Purifier')) {
+            $this->attributes['icon'] = \Mews\Purifier\Facades\Purifier::clean($value);
+            return;
+        }
+
+        // Fallback: strip tags except safe SVG tags
+        $this->attributes['icon'] = strip_tags((string)$value, '<svg><path><circle><rect><line><polyline><polygon><g><title>');
+    }
+
+    public function getIconSafeAttribute(): ?string
+    {
+        return $this->attributes['icon'] ?? null;
+    }
+
     /**
      * Get all plans in this category
      */

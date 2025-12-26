@@ -28,6 +28,12 @@ class AppServiceProvider extends ServiceProvider
                 return Limit::perMinute(30)->by($key);
             });
 
+            // Rate limiter for health checks (protected)
+            RateLimiter::for('health', function (Request $request) {
+                $key = $request->header('X-Monitoring-Token') ?: $request->ip();
+                return Limit::perMinute(10)->by($key);
+            });
+
             // Login attempts limiter
             RateLimiter::for('login', function (Request $request) {
                 $key = $request->ip() ?: 'global';

@@ -10,7 +10,8 @@
     "stripe/stripe-php": "^10.0",
     "barryvdh/laravel-dompdf": "^2.0",
     "laravel/sanctum": "^4.0",
-    "predis/predis": "^2.0"
+    "predis/predis": "^2.0",
+    "mews/purifier": "^4.2"
   },
   "require-dev": {
     "laravel/pint": "^1.13",

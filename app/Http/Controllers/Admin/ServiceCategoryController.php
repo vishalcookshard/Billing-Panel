@@ -34,7 +34,7 @@ class ServiceCategoryController extends Controller
             'name' => 'required|string|max:255',
             'slug' => 'required|string|max:255|unique:service_categories',
             'description' => 'nullable|string',
-            'icon' => 'nullable|string|max:255',
+            'icon' => ['nullable', 'string', 'max:1000', new \App\Rules\SafeHtml()],
             'is_active' => 'boolean',
             'display_order' => 'nullable|integer|min:0',
         ]);
@@ -62,7 +62,7 @@ class ServiceCategoryController extends Controller
             'name' => 'required|string|max:255',
             'slug' => 'required|string|max:255|unique:service_categories,slug,' . $category->id,
             'description' => 'nullable|string',
-            'icon' => 'nullable|string|max:255',
+            'icon' => ['nullable', 'string', 'max:1000', new \App\Rules\SafeHtml()],
             'is_active' => 'boolean',
             'display_order' => 'nullable|integer|min:0',
         ]);

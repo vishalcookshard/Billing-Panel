@@ -8,8 +8,25 @@ use App\Http\Controllers\Api\BillingController;
 Route::post('webhooks/payment/{plugin}', [PaymentWebhookController::class, 'handle'])->middleware('throttle:webhooks');
 
 // Healthcheck
-Route::get('health', function () {
-    // Basic checks
+Route::get('health', function (\Illuminate\Http\Request $request) {
+    // Restrict detailed health info to authorized probes
+    $token = $request->header('X-Monitoring-Token');
+
+    $authorized = false;
+    if ($token && $token === config('app.monitoring_token')) {
+        $authorized = true;
+    }
+
+    if ($request->user() && ($request->user()->is_admin ?? false || ($request->user()->role ?? '') === 'admin')) {
+        $authorized = true;
+    }
+
+    if (!$authorized) {
+        // Minimal response for unauthenticated checks
+        return response()->json(['status' => 'ok']);
+    }
+
+    // Detailed checks - only for authorized probes
     try {
         \DB::connection()->getPdo();
         $db = true;
@@ -27,7 +44,7 @@ Route::get('health', function () {
     $heartbeat = \Illuminate\Support\Facades\Cache::get('system:heartbeat');
     $scheduler_ok = $heartbeat ? (\Carbon\Carbon::parse($heartbeat)->diffInMinutes(now()) < 6) : false;
 
-    // Queue check: verify we can push a small job (ticket) to the queue and it reaches Redis
+    // Queue check
     try {
         \Illuminate\Support\Facades\Redis::set('system:queue_test', time());
         $queue_ok = true;
@@ -36,10 +53,10 @@ Route::get('health', function () {
     }
 
     return response()->json(['app' => 'ok', 'db' => $db, 'redis' => $redis, 'scheduler' => $scheduler_ok, 'queue' => $queue_ok]);
-});
+})->middleware('throttle:health');
 
-// Billing API: requires authentication
-Route::middleware(['auth'])->group(function () {
+// Billing API: requires authentication and rate limiting
+Route::middleware(['auth','throttle:60,1'])->group(function () {
 	Route::post('invoices/{invoice}/apply-promo', [BillingController::class, 'applyPromo']);
 	Route::get('users/{user}/wallet', [BillingController::class, 'wallet']);
 });

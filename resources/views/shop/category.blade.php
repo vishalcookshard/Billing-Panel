@@ -26,9 +26,9 @@
                 <p style="font-size: 1.1rem; color: #666;">{{ $category->description }}</p>
             </div>
             <div class="col-md-4 text-md-end">
-                @if($category->icon)
+                        @if($category->icon_safe)
                     <div style="font-size: 4rem;">
-                        {!! $category->icon !!}
+                        {!! $category->icon_safe !!}
                     </div>
                 @else
                     <i class="fas fa-cube" style="font-size: 4rem; color: var(--primary);"></i>
@@ -70,10 +70,11 @@
                             @endif
 
                             <!-- CTA -->
-                            <form action="{{ route('checkout.show', $plan->id) }}" method="GET" class="mt-auto">
+                            <form action="{{ route('checkout.process', $plan->id) }}" method="POST" class="mt-auto">
+                                @csrf
                                 <div class="mb-3">
                                     <label class="form-label">Billing Cycle:</label>
-                                    <select name="cycle" class="form-select">
+                                    <select name="billing_cycle" class="form-select">
                                         @if($plan->price_monthly)
                                             <option value="monthly">Monthly</option>
                                         @endif

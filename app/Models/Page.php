@@ -26,6 +26,23 @@ class Page extends Model
         'updated_at' => 'datetime',
     ];
 
+    // Sanitize content when saved (HTML Purifier if available)
+    public function setContentAttribute($value)
+    {
+        if (is_null($value)) {
+            $this->attributes['content'] = null;
+            return;
+        }
+
+        if (class_exists('\Mews\Purifier\Facades\Purifier')) {
+            $this->attributes['content'] = \Mews\Purifier\Facades\Purifier::clean($value);
+            return;
+        }
+
+        // Fallback: allow a safe subset of tags
+        $this->attributes['content'] = strip_tags((string)$value, '<p><a><br><strong><em><ul><ol><li><h1><h2><h3><h4><h5><img>');
+    }
+
     /**
      * Get the user who created this page
      */

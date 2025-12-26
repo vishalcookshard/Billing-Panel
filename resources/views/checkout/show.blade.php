@@ -78,13 +78,9 @@
 
                             <p class="mb-3">You need to be logged in to place an order.</p>
 
-                            <form action="{{ route('login') }}" method="GET">
-                                <input type="hidden" name="plan_id" value="{{ $plan->id }}">
-                                <input type="hidden" name="cycle" value="{{ $billingCycle }}">
-                                <button type="submit" class="btn btn-primary me-2">
-                                    <i class="fas fa-sign-in-alt"></i> Login
-                                </button>
-                            </form>
+                            <a href="{{ route('login', ['plan_id' => $plan->id, 'cycle' => $billingCycle]) }}" class="btn btn-primary me-2">
+                                <i class="fas fa-sign-in-alt"></i> Login
+                            </a>
 
                             <a href="{{ route('register') }}" class="btn btn-secondary">
                                 <i class="fas fa-user-plus"></i> Create Account

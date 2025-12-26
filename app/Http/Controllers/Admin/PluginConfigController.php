@@ -21,9 +21,15 @@ class PluginConfigController extends Controller
     {
         $this->authorize('manage-plugins');
 
-        $key = $request->input('key');
-        $value = $request->input('value');
-        $encrypted = (bool)$request->input('encrypted', false);
+        $validated = $request->validate([
+            'key' => 'required|string|max:100',
+            'value' => 'required|string|max:2000',
+            'encrypted' => 'boolean',
+        ]);
+
+        $key = $validated['key'];
+        $value = $validated['value'];
+        $encrypted = (bool)($validated['encrypted'] ?? false);
 
         if ($encrypted) {
             $value = encrypt($value);
