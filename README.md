@@ -4,60 +4,58 @@ A modern, production-ready billing and hosting management system built with Lara
 
 ## 🚀 One-Line Installation (VM/Server)
 
-The installer will ask only for your FQDN (e.g. billing.example.com) and will require confirmation before any destructive action (uninstall).
-
-Interactive install (recommended):
+Run this single command to install the panel. The script is interactive and will ask for your FQDN and confirm any destructive actions:
 
 ```bash
-curl -sSL https://raw.githubusercontent.com/isthisvishal/Billing-Panel/main/scripts/one-command-install.sh | bash -s -- install
+curl -sSL https://raw.githubusercontent.com/isthisvishal/Billing-Panel/main/scripts/one-command-install.sh | sudo bash -s -- install
 ```
 
-Non-interactive install (provide FQDN):
+### Manual installation (step-by-step)
+
+If you prefer to install manually, follow these steps on the target host:
+
+1. Clone the repository:
 
 ```bash
-FQDN=billing.example.com YES=1 bash -c "$(curl -sSL https://raw.githubusercontent.com/isthisvishal/Billing-Panel/main/scripts/one-command-install.sh)" install
+sudo git clone https://github.com/isthisvishal/Billing-Panel.git /opt/billing-panel
+cd /opt/billing-panel
 ```
 
-Uninstall (interactive, will ask for confirmation):
+2. Copy and configure environment:
 
 ```bash
-curl -sSL https://raw.githubusercontent.com/isthisvishal/Billing-Panel/main/scripts/one-command-install.sh | bash -s -- uninstall
+cp .env.example .env
+# Set your domain:
+sed -i "s|^APP_URL=.*|APP_URL=https://billing.example.com|" .env
 ```
 
-Uninstall (non-interactive):
+3. Start containers:
 
 ```bash
-YES=1 bash -c "$(curl -sSL https://raw.githubusercontent.com/isthisvishal/Billing-Panel/main/scripts/one-command-install.sh)" uninstall
+sudo docker compose up -d --build
 ```
 
-### 🔁 Quick action: single-line prompt (install / uninstall / exit)
-
-Run a single-line prompt that asks which action to perform. Useful for quick interactive control.
-
-- Local (repo present):
+4. Run migrations & seeders:
 
 ```bash
-bash -lc 'read -p "Choose action [install/uninstall/exit]: " ACTION; case "$ACTION" in install|i) sudo bash scripts/one-command-install.sh install ;; uninstall|u) sudo bash scripts/one-command-install.sh uninstall ;; exit|e) echo "Exit" ;; *) echo "Unknown action";; esac'
+sudo docker compose exec -T app php artisan migrate --force
+sudo docker compose exec -T app php artisan db:seed --force
 ```
 
-- Remote (no local repo required):
+5. Visit https://billing.example.com (ensure DNS points to this host and ports 80/443 are accessible).
+
+
+### Uninstall
+
+To uninstall (stops and removes containers and named volumes):
 
 ```bash
-bash -lc 'read -p "Choose action [install/uninstall/exit]: " ACTION; case "$ACTION" in install|i) curl -sSL https://raw.githubusercontent.com/isthisvishal/Billing-Panel/main/scripts/one-command-install.sh | sudo bash -s -- install ;; uninstall|u) curl -sSL https://raw.githubusercontent.com/isthisvishal/Billing-Panel/main/scripts/one-command-install.sh | sudo bash -s -- uninstall ;; exit|e) echo "Exit" ;; *) echo "Unknown action";; esac'
+curl -sSL https://raw.githubusercontent.com/isthisvishal/Billing-Panel/main/scripts/one-command-install.sh | sudo bash -s -- uninstall
 ```
 
-Use these to quickly choose install/uninstall without memorizing subcommands.
+(Use `YES=1` environment variable to auto-confirm in non-interactive environments.)
 
-Tip: there's a DRY-RUN test script for CI/local testing that simulates the prompt without performing actions:
 
-```bash
-# Local dry-run
-bash scripts/test-install-prompt.sh
-
-# CI-style (non-interactive)
-ACTION=install bash scripts/test-install-prompt.sh
-ACTION=uninstall bash scripts/test-install-prompt.sh
-```
 ## ✨ Features
 
 ### Frontend
@@ -124,12 +122,18 @@ Uninstall (non-interactive):
 YES=1 sudo bash scripts/one-command-install.sh uninstall
 ```
 
-### System Requirements
-- Ubuntu 20.04+ or Debian 11+
-- 2GB+ RAM
-- 5GB+ disk space
-- Root access
-- Valid domain name (FQDN, e.g., billing.example.com)
+### System Requirements & Compatibility
+- OS: Ubuntu 20.04+ or Debian 11+ (Ubuntu 22.04 recommended)
+- Memory: 2GB+ RAM (4GB+ recommended for production)
+- Disk: 5GB+ free space
+- Root access required for Docker installation and system changes
+- Network: Ports 80 and 443 open; DNS A record for your FQDN pointed to the server
+- Docker: Engine 20.10+ and Compose (v2+) tested
+- Stack tested with: PHP 8.2, Laravel 12, MariaDB 10.11, Redis
+
+Notes:
+- For production, configure TLS termination and backups, and ensure appropriate resource sizing.
+
 
 ### Installation Steps
 
@@ -158,6 +162,25 @@ The installation script will:
    ```
 
 2. **Login to Admin**
+
+---
+
+## 🧑‍💻 Author
+
+- **Vishal** — GitHub: https://github.com/isthisvishal
+
+
+---
+
+## ✳️ Features (summary)
+
+- Billing and subscription management (invoices, idempotent payments)
+- Wallets, promo codes, credit notes, multi-currency scaffolding
+- Plugin-based payment gateway support (Stripe integration present)
+- Admin panel to manage pages, plans, categories and users
+- Docker-first installer for quick deployment and easy upgrades
+
+
    - Go to `/admin/pages` in the URL (or use sidebar)
    - Use default credentials
 
