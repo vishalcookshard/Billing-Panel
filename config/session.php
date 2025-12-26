@@ -90,7 +90,7 @@ return [
     | HTTPS Only Cookies
     |--------------------------------------------------------------------------
     */
-    'secure' => env('SESSION_SECURE_COOKIES'),
+    'secure' => env('SESSION_SECURE_COOKIES', true),
 
     /*
     |--------------------------------------------------------------------------
@@ -104,5 +104,5 @@ return [
     | Same-Site Cookies
     |--------------------------------------------------------------------------
     */
-    'same_site' => 'lax',
+    'same_site' => env('SESSION_SAME_SITE', 'lax'),
 ];

@@ -53,6 +53,17 @@ class AppServiceProvider extends ServiceProvider
                         throw new \RuntimeException('Queue connectivity check failed: ' . $e->getMessage());
                     }
                 }
+
+                // Validate critical environment variables in production
+                $required = ['APP_KEY', 'APP_URL', 'DB_HOST', 'DB_DATABASE', 'DB_USERNAME', 'DB_PASSWORD', 'REDIS_HOST', 'QUEUE_CONNECTION'];
+                $missing = [];
+                foreach ($required as $k) {
+                    if (empty(env($k))) $missing[] = $k;
+                }
+
+                if (!empty($missing)) {
+                    throw new \RuntimeException('Missing required environment variables for production: ' . implode(', ', $missing));
+                }
             }
         });
     }

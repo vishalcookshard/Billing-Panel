@@ -28,6 +28,15 @@ while true; do
         echo "FQDN is required."; continue
       fi
 
+      # Prevent accidental reinstall on an existing system
+      if [[ -f .env ]]; then
+        echo "An .env exists in this directory. This may be a live installation."
+        read -rp "Proceed with install and potentially overwrite existing installation? (yes/no): " confirm
+        if [[ "$confirm" != "yes" ]]; then
+          echo "Aborting installation to avoid accidental overwrite."; continue
+        fi
+      fi
+
       echo "Preparing .env..."
       if [[ -f .env ]]; then
         echo ".env already exists, backing up to .env.bak"
@@ -80,13 +89,19 @@ EOF
       docker compose exec -T app php artisan key:generate --ansi
       docker compose exec -T app php artisan migrate --force
 
-      echo "Creating admin user..."
-      ADMIN_EMAIL=admin@$fqdn
-      ADMIN_PASSWORD=$(openssl rand -base64 12)
-      docker compose exec -T app php artisan app:install --email=${ADMIN_EMAIL} --password=${ADMIN_PASSWORD}
+      # check if an admin already exists to avoid accidental overwrite
+      has_admin=$(docker compose exec -T app php -r "require 'vendor/autoload.php'; \$app=require 'bootstrap/app.php'; \$kernel=\$app->make(Illuminate\\Contracts\\Console\\Kernel::class); echo (bool)\App\\Models\\User::where('is_admin',1)->count();") || true
+      if [[ "$has_admin" == "1" || "$has_admin" == "true" ]]; then
+        echo "Warning: An admin user already exists in the database. Skipping admin creation.";
+      else
+        echo "Creating admin user..."
+        ADMIN_EMAIL=admin@$fqdn
+        ADMIN_PASSWORD=$(openssl rand -base64 12)
+        docker compose exec -T app php artisan app:install --email=${ADMIN_EMAIL} --password=${ADMIN_PASSWORD}
 
-      echo "Admin user created: ${ADMIN_EMAIL}"
-      echo "Admin password: ${ADMIN_PASSWORD}"
+        echo "Admin user created: ${ADMIN_EMAIL}"
+        echo "Admin password: ${ADMIN_PASSWORD}"
+      fi
 
       echo "Starting queue and scheduler..."
       docker compose up -d worker scheduler
@@ -102,9 +117,31 @@ EOF
       echo "Installation complete. Visit https://$fqdn to access the app."
       ;;
     2)
+      echo "Preparing to uninstall. A database backup will be taken automatically."
+
+      # Create backup dir
+      mkdir -p backups
+      BACKUP_FILE="backups/db-backup-$(date +%Y%m%d-%H%M%S).sql"
+
+      echo "Taking database dump to ${BACKUP_FILE}..."
+      if docker compose exec -T db sh -c 'exec mysqldump -u"${MYSQL_USER:-root}" -p"${MYSQL_ROOT_PASSWORD:-${DB_PASSWORD:-secret}}" "${MYSQL_DATABASE:-billing}"' > "${BACKUP_FILE}" 2>/dev/null; then
+        echo "Database backup saved to ${BACKUP_FILE}"
+      else
+        echo "Database backup failed. Proceeding with uninstall only after confirmation."
+        read -rp "Continue with uninstall despite failed backup? (yes/no): " confirm
+        if [[ "$confirm" != "yes" ]]; then
+          echo "Aborting uninstall to avoid data loss."; continue
+        fi
+      fi
+
+      read -rp "Are you sure you want to uninstall and remove volumes? This will destroy data. (yes/no): " confirm_uninstall
+      if [[ "$confirm_uninstall" != "yes" ]]; then
+        echo "Uninstall aborted."; continue
+      fi
+
       echo "Stopping and removing containers and volumes..."
       docker compose down -v --remove-orphans
-      echo "Uninstall complete. Backups (if any) are preserved in .env.bak"
+      echo "Uninstall complete. Backup: ${BACKUP_FILE}"
       ;;
     3)
       echo "Exiting."; exit 0;
