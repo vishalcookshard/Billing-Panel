@@ -4,18 +4,30 @@ A modern, production-ready billing and hosting management system built with Lara
 
 ## 🚀 One-Line Installation (VM/Server)
 
-The installer will ask only for your FQDN (e.g. billing.example.com).
+The installer will ask only for your FQDN (e.g. billing.example.com) and will require confirmation before any destructive action (uninstall).
 
-Interactive (recommended):
+Interactive install (recommended):
 
 ```bash
-curl -sSL https://raw.githubusercontent.com/isthisvishal/Billing-Panel/main/scripts/one-command-install.sh | bash -s --
+curl -sSL https://raw.githubusercontent.com/isthisvishal/Billing-Panel/main/scripts/one-command-install.sh | bash -s -- install
 ```
 
-Non-interactive (provide FQDN):
+Non-interactive install (provide FQDN):
 
 ```bash
-bash -c "$(curl -sSL https://raw.githubusercontent.com/isthisvishal/Billing-Panel/main/scripts/one-command-install.sh)" billing.example.com
+FQDN=billing.example.com YES=1 bash -c "$(curl -sSL https://raw.githubusercontent.com/isthisvishal/Billing-Panel/main/scripts/one-command-install.sh)" install
+```
+
+Uninstall (interactive, will ask for confirmation):
+
+```bash
+curl -sSL https://raw.githubusercontent.com/isthisvishal/Billing-Panel/main/scripts/one-command-install.sh | bash -s -- uninstall
+```
+
+Uninstall (non-interactive):
+
+```bash
+YES=1 bash -c "$(curl -sSL https://raw.githubusercontent.com/isthisvishal/Billing-Panel/main/scripts/one-command-install.sh)" uninstall
 ```
 
 ## ✨ Features
@@ -56,22 +68,32 @@ bash -c "$(curl -sSL https://raw.githubusercontent.com/isthisvishal/Billing-Pane
 
 ### One-Command Installation
 
-Run the bundled installer which will prompt for your domain (FQDN):
+Run the bundled installer which will prompt for your domain (FQDN) and ask for confirmation before any destructive action.
+
+Interactive install (recommended):
 
 ```bash
 sudo bash scripts/one-command-install.sh
+# or
+curl -sSL https://raw.githubusercontent.com/isthisvishal/Billing-Panel/main/scripts/one-command-install.sh | sudo bash -s -- install
 ```
 
-Or run remotely in one line (interactive prompt for FQDN):
+Non-interactive install (provide FQDN):
 
 ```bash
-curl -sSL https://raw.githubusercontent.com/isthisvishal/Billing-Panel/main/scripts/one-command-install.sh | sudo bash -s --
+FQDN=billing.example.com YES=1 sudo bash scripts/one-command-install.sh install
 ```
 
-To run non-interactively provide the FQDN as the first argument:
+Uninstall (interactive):
 
 ```bash
-sudo bash scripts/one-command-install.sh billing.example.com
+sudo bash scripts/one-command-install.sh uninstall
+```
+
+Uninstall (non-interactive):
+
+```bash
+YES=1 sudo bash scripts/one-command-install.sh uninstall
 ```
 
 ### System Requirements
