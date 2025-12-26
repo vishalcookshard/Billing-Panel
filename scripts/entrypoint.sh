@@ -22,16 +22,16 @@ if [ ! -f .env ]; then
   cp .env.example .env || fatal "Could not copy .env.example to .env"
 fi
 
-# Generate APP_KEY if missing
-if ! grep -q "^APP_KEY=" .env || grep -q "^APP_KEY=$" .env; then
-  log "Generating APP_KEY..."
-  php artisan key:generate --ansi || fatal "Failed to generate APP_KEY"
-fi
-
 # Run composer install (no-scripts to avoid side effects)
 if [ ! -f vendor/autoload.php ]; then
   log "Running composer install..."
   composer install --no-interaction --no-scripts --optimize-autoloader || fatal "Composer install failed"
+fi
+
+# Generate APP_KEY if missing
+if ! grep -q "^APP_KEY=" .env || grep -q "^APP_KEY=$" .env; then
+  log "Generating APP_KEY..."
+  php artisan key:generate --ansi || fatal "Failed to generate APP_KEY"
 fi
 
 # Run artisan commands
