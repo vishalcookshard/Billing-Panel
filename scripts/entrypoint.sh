@@ -1,7 +1,7 @@
 
 #!/usr/bin/env bash
-# Robust entrypoint: never exit early, always log errors, keep container alive
-set -u
+# Robust entrypoint: ensure environment is ready and start php-fpm
+set -euo pipefail
 
 log() { echo "[entrypoint] $*"; }
 fatal() { echo "[entrypoint][FATAL] $*" >&2; exit 1; }
@@ -29,7 +29,7 @@ if ! grep -q "^APP_KEY=" .env || grep -q "^APP_KEY=$" .env; then
   php artisan key:generate --ansi || fatal "Failed to generate APP_KEY"
 fi
 
-# Run composer install with --no-scripts
+# Run composer install (no-scripts to avoid side effects)
 if [ ! -f vendor/autoload.php ]; then
   log "Running composer install..."
   composer install --no-interaction --no-scripts --optimize-autoloader || fatal "Composer install failed"
