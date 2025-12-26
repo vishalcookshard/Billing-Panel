@@ -6,12 +6,23 @@ use App\Models\Invoice;
 use App\Services\ProvisioningService;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
+use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Log;
 
-class SuspendServiceJob implements ShouldQueue
+class SuspendServiceJob implements ShouldQueue, ShouldBeUnique
+{
+    public function uniqueId()
+    {
+        return 'suspend-'.$this->invoice->id;
+    }
+
+    public function uniqueFor(): int
+    {
+        return 3600;
+    }
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 

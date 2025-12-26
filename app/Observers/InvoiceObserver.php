@@ -24,21 +24,25 @@ class InvoiceObserver
         Log::info('InvoiceObserver status changed', ['invoice_id' => $invoice->id, 'from' => $original, 'to' => $current]);
 
         switch ($current) {
-            case 'paid':
+            case Invoice::STATUS_PAID:
                 InvoicePaid::dispatch($invoice);
                 break;
-            case 'overdue':
+            case Invoice::STATUS_WARNED:
+                InvoiceGraceWarning::dispatch($invoice);
+                break;
+            case Invoice::STATUS_GRACE:
+                // still in grace period; may choose to notify
+                InvoiceGraceWarning::dispatch($invoice);
+                break;
+            case Invoice::STATUS_SUSPENDED:
                 InvoiceOverdue::dispatch($invoice);
                 break;
-            case 'cancelled':
-                InvoiceCancelled::dispatch($invoice);
-                break;
-            case 'expired':
+            case Invoice::STATUS_TERMINATED:
                 InvoiceExpired::dispatch($invoice);
                 break;
         }
 
-        // update last_status_at
+        // update last_status_at without firing another observer
         $invoice->last_status_at = now();
         $invoice->saveQuietly();
     }

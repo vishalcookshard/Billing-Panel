@@ -6,12 +6,24 @@ use App\Models\Invoice;
 use App\Services\ProvisioningService;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
+use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Log;
 
-class ProvisionJob implements ShouldQueue
+class ProvisionJob implements ShouldQueue, ShouldBeUnique
+{
+    public function uniqueId()
+    {
+        return 'provision-'.$this->invoice->id;
+    }
+
+    public function uniqueFor(): int
+    {
+        // Keep job unique for 1 hour to avoid duplicate provisioning
+        return 3600;
+    }
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 

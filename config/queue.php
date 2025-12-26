@@ -10,6 +10,13 @@ return [
             'queue' => 'default',
             'retry_after' => 90,
         ],
+        'redis' => [
+            'driver' => 'redis',
+            'connection' => 'default',
+            'queue' => env('REDIS_QUEUE', 'default'),
+            'retry_after' => 90,
+            'block_for' => null,
+        ],
     ],
 
     'failed' => [

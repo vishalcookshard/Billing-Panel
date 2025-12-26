@@ -7,6 +7,24 @@ use App\Http\Controllers\Api\BillingController;
 // Payment webhooks (throttled)
 Route::post('webhooks/payment/{plugin}', [PaymentWebhookController::class, 'handle'])->middleware('throttle:webhooks');
 
+// Healthcheck
+Route::get('health', function () {
+    try {
+        \DB::connection()->getPdo();
+        $db = true;
+    } catch (\Throwable $e) {
+        $db = false;
+    }
+
+    try {
+        $redis = \Illuminate\Support\Facades\Redis::ping() === 'PONG';
+    } catch (\Throwable $e) {
+        $redis = false;
+    }
+
+    return response()->json(['app' => 'ok', 'db' => $db, 'redis' => $redis]);
+});
+
 // Billing API: requires authentication
 Route::middleware(['auth'])->group(function () {
 	Route::post('invoices/{invoice}/apply-promo', [BillingController::class, 'applyPromo']);

@@ -31,7 +31,7 @@ services:
       - appnet
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "php", "-v"]
+      test: ["CMD-SHELL", "wget --spider --quiet ${APP_URL:-http://localhost}/api/health || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -43,6 +43,8 @@ services:
     ports:
       - "80:80"
       - "443:443"
+    environment:
+      - APP_HOST=${APP_HOST:-localhost}
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - ./public:/var/www/public:ro
@@ -68,7 +70,7 @@ services:
       - appnet
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -u root -p\"${DB_PASSWORD:-secret}\" >/dev/null 2>&1 || exit 1"]
       interval: 10s
       timeout: 10s
       retries: 10
@@ -92,7 +94,7 @@ services:
       context: .
       dockerfile: Dockerfile
     container_name: billing-panel-worker
-    command: php artisan queue:work redis --sleep=3 --tries=3 --timeout=90
+    command: php artisan queue:work redis --sleep=3 --tries=3 --timeout=90 --backoff=60
     environment:
       - APP_ENV=${APP_ENV:-production}
       - APP_DEBUG=${APP_DEBUG:-false}
@@ -117,7 +119,7 @@ services:
       context: .
       dockerfile: Dockerfile
     container_name: billing-panel-scheduler
-    command: sh -c "while :; do php artisan schedule:run --verbose --no-interaction; sleep 60; done"
+    command: php artisan schedule:work --verbose --no-interaction
     environment:
       - APP_ENV=${APP_ENV:-production}
       - APP_DEBUG=${APP_DEBUG:-false}

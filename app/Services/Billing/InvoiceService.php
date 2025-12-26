@@ -43,6 +43,26 @@ class InvoiceService
             }
             $inv->save();
 
+            // Create or ensure payment record (idempotent)
+            if (!empty($paymentData)) {
+                $existing = null;
+                if (!empty($paymentData['id'])) {
+                    $existing = \App\Models\Payment::where('gateway_id', $paymentData['id'])->orWhere('idempotency_key', $idempotencyKey)->first();
+                }
+
+                if (!$existing) {
+                    \App\Models\Payment::create([
+                        'invoice_id' => $inv->id,
+                        'gateway' => $paymentData['object_type'] ?? ($paymentData['gateway'] ?? 'gateway'),
+                        'gateway_id' => $paymentData['id'] ?? null,
+                        'idempotency_key' => $idempotencyKey,
+                        'amount' => $paymentData['amount'] ?? $inv->amount,
+                        'currency' => $paymentData['currency'] ?? $inv->currency,
+                        'meta' => $paymentData,
+                    ]);
+                }
+            }
+
             // Create an audit record
             Audit::create(["invoice_id" => $inv->id, "event" => "paid", "meta" => json_encode($paymentData)]);
 

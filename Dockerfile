@@ -12,6 +12,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libzip-dev \
     libpq-dev \
     libonig-dev \
+    libpng-dev \
+    libjpeg-dev \
+    libfreetype6-dev \
     curl \
     zip \
     ca-certificates \
@@ -19,19 +22,28 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # Install PHP extensions
-RUN docker-php-ext-install \
+RUN docker-php-ext-configure gd --with-freetype --with-jpeg \
+    && docker-php-ext-install \
     pdo \
     pdo_mysql \
     intl \
     zip \
     mbstring \
-    opcache
+    opcache \
+    gd \
+    bcmath
 
 # Enable OpCache
 RUN docker-php-ext-enable opcache
 
 # Install Composer
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
+
+# Install redis extension
+RUN pecl install redis && docker-php-ext-enable redis
+
+# Install composer deps (production)
+RUN composer install --no-dev --prefer-dist --optimize-autoloader --no-interaction || true
 
 # Set working directory
 WORKDIR /var/www

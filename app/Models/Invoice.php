@@ -34,7 +34,8 @@ class Invoice extends Model
         'provisioned_at' => 'datetime',
     ];
 
-    public const STATUS_PENDING = 'pending';
+    // Strict lifecycle: unpaid -> warned -> grace -> suspended -> terminated -> paid
+    public const STATUS_PENDING = 'pending'; // legacy
     public const STATUS_UNPAID = 'unpaid';
     public const STATUS_WARNED = 'warned';
     public const STATUS_GRACE = 'grace';
@@ -60,11 +61,62 @@ class Invoice extends Model
         return $this->status === self::STATUS_PAID || $this->paid_at !== null;
     }
 
+    public static function allowedTransitions(): array
+    {
+        return [
+            self::STATUS_UNPAID => [self::STATUS_WARNED, self::STATUS_PAID],
+            self::STATUS_WARNED => [self::STATUS_GRACE, self::STATUS_PAID],
+            self::STATUS_GRACE => [self::STATUS_SUSPENDED, self::STATUS_PAID],
+            self::STATUS_SUSPENDED => [self::STATUS_TERMINATED, self::STATUS_PAID],
+            self::STATUS_TERMINATED => [],
+            self::STATUS_PAID => [],
+        ];
+    }
+
+    public function canTransitionTo(string $to): bool
+    {
+        $from = $this->status ?? self::STATUS_UNPAID;
+        $allowed = static::allowedTransitions();
+
+        // Allow transition to the same state
+        if ($from === $to) return true;
+
+        return in_array($to, $allowed[$from] ?? [], true);
+    }
+
+    /**
+     * Transition status in a safe, race-free way using DB lock.
+     */
+    public function transitionTo(string $to): bool
+    {
+        if (!$this->exists) return false;
+
+        return \Illuminate\Support\Facades\DB::transaction(function () use ($to) {
+            $inv = static::lockForUpdate()->find($this->id);
+            if (!$inv) return false;
+
+            if (!$inv->canTransitionTo($to)) {
+                throw new \RuntimeException("Invalid status transition from {$inv->status} to {$to}");
+            }
+
+            $inv->status = $to;
+            $inv->last_status_at = now();
+            $inv->save();
+
+            return true;
+        });
+    }
+
     // Prevent mutating core billing fields after payment
     public function setAttribute($key, $value)
     {
         if ($this->exists && $this->isPaid() && in_array($key, ['amount', 'user_id', 'currency', 'service_id'])) {
             throw new \RuntimeException('Cannot modify immutable invoice fields after payment');
+        }
+
+        // Prevent arbitrary status resets once reached terminal states
+        if ($key === 'status' && $this->exists && $this->status === self::STATUS_PAID && $value !== self::STATUS_PAID) {
+            throw new \RuntimeException('Cannot change status of a paid invoice');
         }
 
         return parent::setAttribute($key, $value);

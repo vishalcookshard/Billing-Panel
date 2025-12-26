@@ -15,7 +15,7 @@ class InvoiceFactory extends Factory
         return [
             'user_id' => User::factory(),
             'amount' => $this->faker->randomFloat(2, 1, 100),
-            'status' => 'pending',
+            'status' => Invoice::STATUS_UNPAID,
             'due_date' => now()->addDays(7),
         ];
     }

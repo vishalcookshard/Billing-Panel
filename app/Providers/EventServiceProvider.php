@@ -17,13 +17,25 @@ use App\Listeners\HandleInvoiceExpired;
 class EventServiceProvider extends ServiceProvider
 {
     protected $listen = [
-        // Disabled temporarily due to Laravel 12 bootstrap issues
-        // Events will still fire, but listeners won't be automatically wired
+        InvoicePaid::class => [
+            HandleInvoicePaid::class,
+        ],
+        InvoiceOverdue::class => [
+            HandleInvoiceOverdue::class,
+        ],
+        InvoiceGraceWarning::class => [
+            HandleInvoiceGraceWarning::class,
+        ],
+        InvoiceCancelled::class => [
+            HandleInvoiceCancelled::class,
+        ],
+        InvoiceExpired::class => [
+            HandleInvoiceExpired::class,
+        ],
     ];
 
     public function boot()
     {
-        // Disabled parent boot to avoid framework binding errors
-        // Event listeners can be registered manually in routes or controllers if needed
+        parent::boot();
     }
 }

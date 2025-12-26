@@ -16,7 +16,7 @@ class ScanInvoices extends Command
 {
     protected $signature = 'invoices:scan';
 
-    protected $description = 'Scan invoices to send warnings, suspend or terminate services based on grace periods';
+    protected $description = 'Scan invoices to send warnings, move through grace periods, suspend or terminate services based on configured thresholds';
 
     public function handle()
     {
@@ -28,57 +28,71 @@ class ScanInvoices extends Command
 
         $today = Carbon::now();
 
-        // 1) Mark invoices overdue when past due date
-        $overdueInvoices = Invoice::where('status', 'pending')
+        // 1) Identify invoices that have gone past due and are still unpaid -> warn
+        $pastDue = Invoice::whereIn('status', [Invoice::STATUS_PENDING, Invoice::STATUS_UNPAID])
             ->whereNotNull('due_date')
             ->where('due_date', '<', $today)
             ->get();
 
-        foreach ($overdueInvoices as $invoice) {
-            $invoice->status = 'overdue';
-            $invoice->save();
-            InvoiceOverdue::dispatch($invoice);
-            Log::info('Invoice marked overdue', ['invoice_id' => $invoice->id]);
-        }
-
-        // 2) Handle grace warnings
-        $warningThreshold = $today->copy()->subDays($warningDays);
-        $invoicesToWarn = Invoice::where('status', 'overdue')
-            ->whereNull('grace_notified_at')
-            ->where('due_date', '<', $today->copy()->subDays(0))
-            ->get();
-
-        foreach ($invoicesToWarn as $invoice) {
-            // notify if within warningDays before full grace expires
-            $daysOverdue = $invoice->due_date ? $today->diffInDays($invoice->due_date) : null;
-            if ($daysOverdue !== null && $daysOverdue >= 0 && $daysOverdue <= $graceDays) {
+        foreach ($pastDue as $invoice) {
+            try {
+                $invoice->transitionTo(Invoice::STATUS_WARNED);
                 InvoiceGraceWarning::dispatch($invoice);
                 $invoice->grace_notified_at = now();
                 $invoice->save();
-                Log::info('Invoice grace warning sent', ['invoice_id' => $invoice->id]);
+                Log::info('Invoice marked warned and grace warning sent', ['invoice_id' => $invoice->id]);
+            } catch (\Throwable $e) {
+                Log::warning('Skipping warn transition for invoice', ['invoice_id' => $invoice->id, 'error' => $e->getMessage()]);
             }
         }
 
-        // 3) Suspend after grace period
-        $suspendThreshold = $today->copy()->subDays($graceDays);
-        $toSuspend = Invoice::where('status', 'overdue')
-            ->where('due_date', '<', $suspendThreshold)
+        // 2) Move warned invoices into grace phase when appropriate
+        $warned = Invoice::where('status', Invoice::STATUS_WARNED)
+            ->whereNotNull('due_date')
+            ->get();
+
+        foreach ($warned as $invoice) {
+            $daysOverdue = $invoice->due_date ? $today->diffInDays($invoice->due_date) : null;
+            if ($daysOverdue !== null && $daysOverdue >= $warningDays) {
+                try {
+                    $invoice->transitionTo(Invoice::STATUS_GRACE);
+                    Log::info('Invoice moved to grace', ['invoice_id' => $invoice->id]);
+                } catch (\Throwable $e) {
+                    Log::warning('Failed to move invoice to grace', ['invoice_id' => $invoice->id, 'error' => $e->getMessage()]);
+                }
+            }
+        }
+
+        // 3) Suspend invoices that have exceeded grace period
+        $toSuspend = Invoice::where('status', Invoice::STATUS_GRACE)
+            ->whereNotNull('due_date')
+            ->where('due_date', '<', $today->copy()->subDays($graceDays))
             ->get();
 
         foreach ($toSuspend as $invoice) {
-            SuspendServiceJob::dispatch($invoice);
-            Log::info('SuspendServiceJob dispatched due to grace expiry', ['invoice_id' => $invoice->id]);
+            try {
+                $invoice->transitionTo(Invoice::STATUS_SUSPENDED);
+                SuspendServiceJob::dispatch($invoice)->onQueue('billing');
+                Log::info('SuspendServiceJob dispatched due to grace expiry', ['invoice_id' => $invoice->id]);
+            } catch (\Throwable $e) {
+                Log::warning('Failed to suspend invoice', ['invoice_id' => $invoice->id, 'error' => $e->getMessage()]);
+            }
         }
 
-        // 4) Terminate after autoTerminateDays
-        $terminateThreshold = $today->copy()->subDays($autoTerminateDays);
-        $toTerminate = Invoice::where(function ($q) use ($terminateThreshold) {
-            $q->where('status', 'overdue')->where('due_date', '<', $terminateThreshold);
-        })->get();
+        // 4) Terminate after autoTerminateDays elapsed since due date
+        $toTerminate = Invoice::where('status', Invoice::STATUS_SUSPENDED)
+            ->whereNotNull('due_date')
+            ->where('due_date', '<', $today->copy()->subDays($autoTerminateDays))
+            ->get();
 
         foreach ($toTerminate as $invoice) {
-            TerminateServiceJob::dispatch($invoice);
-            Log::info('TerminateServiceJob dispatched due to auto-terminate', ['invoice_id' => $invoice->id]);
+            try {
+                $invoice->transitionTo(Invoice::STATUS_TERMINATED);
+                TerminateServiceJob::dispatch($invoice)->onQueue('billing');
+                Log::info('TerminateServiceJob dispatched due to auto-terminate', ['invoice_id' => $invoice->id]);
+            } catch (\Throwable $e) {
+                Log::warning('Failed to terminate invoice', ['invoice_id' => $invoice->id, 'error' => $e->getMessage()]);
+            }
         }
 
         $this->info('Invoice scan completed.');

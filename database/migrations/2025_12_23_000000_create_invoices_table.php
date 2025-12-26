@@ -12,7 +12,7 @@ return new class extends Migration
             $table->id();
             $table->foreignId('user_id')->nullable()->constrained()->nullOnDelete();
             $table->decimal('amount', 10, 2);
-            $table->string('status')->default('pending');
+            $table->string('status')->default('unpaid');
             $table->dateTime('due_date')->nullable();
             $table->string('automation_status')->nullable();
             $table->string('service_id')->nullable();
