@@ -31,10 +31,10 @@ if [ ! -f vendor/autoload.php ]; then
   COMPOSER_ALLOW_SUPERUSER=1 composer install --no-interaction --no-scripts --optimize-autoloader || fatal "Composer install failed"
 fi
 
-# Generate APP_KEY if missing
+# Generate APP_KEY if missing (without booting the framework to avoid provider side effects)
 if ! grep -q "^APP_KEY=" .env || grep -q "^APP_KEY=$" .env; then
   log "Generating APP_KEY..."
-  php artisan key:generate --ansi || fatal "Failed to generate APP_KEY"
+  php -r "file_exists('.env') || copy('.env.example', '.env'); $env = file_get_contents('.env'); if (!preg_match('/^APP_KEY=.+/m', $env)) { file_put_contents('.env', rtrim($env, "\n") . "\nAPP_KEY=base64:" . base64_encode(random_bytes(32)) . "\n"); }" || fatal "Failed to generate APP_KEY"
 fi
 
 # Run artisan commands
