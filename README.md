@@ -30,6 +30,34 @@ Uninstall (non-interactive):
 YES=1 bash -c "$(curl -sSL https://raw.githubusercontent.com/isthisvishal/Billing-Panel/main/scripts/one-command-install.sh)" uninstall
 ```
 
+### 🔁 Quick action: single-line prompt (install / uninstall / exit)
+
+Run a single-line prompt that asks which action to perform. Useful for quick interactive control.
+
+- Local (repo present):
+
+```bash
+bash -lc 'read -p "Choose action [install/uninstall/exit]: " ACTION; case "$ACTION" in install|i) sudo bash scripts/one-command-install.sh install ;; uninstall|u) sudo bash scripts/one-command-install.sh uninstall ;; exit|e) echo "Exit" ;; *) echo "Unknown action";; esac'
+```
+
+- Remote (no local repo required):
+
+```bash
+bash -lc 'read -p "Choose action [install/uninstall/exit]: " ACTION; case "$ACTION" in install|i) curl -sSL https://raw.githubusercontent.com/isthisvishal/Billing-Panel/main/scripts/one-command-install.sh | sudo bash -s -- install ;; uninstall|u) curl -sSL https://raw.githubusercontent.com/isthisvishal/Billing-Panel/main/scripts/one-command-install.sh | sudo bash -s -- uninstall ;; exit|e) echo "Exit" ;; *) echo "Unknown action";; esac'
+```
+
+Use these to quickly choose install/uninstall without memorizing subcommands.
+
+Tip: there's a DRY-RUN test script for CI/local testing that simulates the prompt without performing actions:
+
+```bash
+# Local dry-run
+bash scripts/test-install-prompt.sh
+
+# CI-style (non-interactive)
+ACTION=install bash scripts/test-install-prompt.sh
+ACTION=uninstall bash scripts/test-install-prompt.sh
+```
 ## ✨ Features
 
 ### Frontend

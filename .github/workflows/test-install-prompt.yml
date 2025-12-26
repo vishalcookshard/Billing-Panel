@@ -1,0 +1,26 @@
+name: Test Install Prompt (DRY-RUN)
+
+on:
+  push:
+    paths:
+      - 'scripts/test-install-prompt.sh'
+      - '.github/workflows/test-install-prompt.yml'
+  pull_request:
+    paths:
+      - 'scripts/test-install-prompt.sh'
+
+jobs:
+  test-prompt:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run DRY-RUN install prompt (install)
+        run: |
+          ACTION=install bash scripts/test-install-prompt.sh | tee output-install.txt
+          grep -q "\[DRY-RUN\] Action: install" output-install.txt
+          grep -q "one-command-install.sh | sudo bash -s -- install" output-install.txt
+      - name: Run DRY-RUN install prompt (uninstall)
+        run: |
+          ACTION=uninstall bash scripts/test-install-prompt.sh | tee output-uninstall.txt
+          grep -q "\[DRY-RUN\] Action: uninstall" output-uninstall.txt
+          grep -q "one-command-install.sh | sudo bash -s -- uninstall" output-uninstall.txt
