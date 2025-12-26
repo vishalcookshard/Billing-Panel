@@ -6,6 +6,7 @@ use Illuminate\Http\Request;
 use App\Models\Plugin;
 use App\Models\PluginConfig;
 use App\Models\Invoice;
+use App\Services\Billing\InvoiceService;
 use Illuminate\Support\Facades\Log;
 use App\Events\InvoicePaid;
 
@@ -91,15 +92,24 @@ class StripePlugin implements PaymentGatewayInterface
         if ($type === 'charge.succeeded' || $type === 'payment_intent.succeeded') {
             if ($invoiceId) {
                 $invoice = Invoice::find($invoiceId);
-                if ($invoice && $invoice->status !== 'paid') {
-                    $invoice->status = 'paid';
-                    $invoice->save();
+                if ($invoice) {
+                    $idempotency = $data['id'] ?? null;
 
-                    InvoicePaid::dispatch($invoice);
+                    $service = app(InvoiceService::class);
+                    try {
+                        $processed = $service->markPaid($invoice, $object, $idempotency);
+                        if ($processed) {
+                            InvoicePaid::dispatch($invoice);
+                            Log::info('Stripe webhook marked invoice paid', ['invoice_id' => $invoice->id]);
+                        } else {
+                            Log::info('Stripe webhook already processed or idempotent skip', ['invoice_id' => $invoice->id]);
+                        }
 
-                    Log::info('Stripe webhook marked invoice paid', ['invoice_id' => $invoice->id]);
-
-                    return ['handled' => true, 'invoice_id' => $invoice->id];
+                        return ['handled' => true, 'invoice_id' => $invoice->id, 'processed' => $processed];
+                    } catch (\Throwable $e) {
+                        Log::error('Stripe payment processing error', ['error' => $e->getMessage(), 'invoice_id' => $invoice->id]);
+                        return ['handled' => false, 'message' => 'processing_error'];
+                    }
                 }
             }
 

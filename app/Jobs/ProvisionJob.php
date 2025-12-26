@@ -34,11 +34,18 @@ class ProvisionJob implements ShouldQueue
     {
         Log::info('ProvisionJob started', ['invoice_id' => $this->invoice->id]);
 
+        // Idempotency: skip if already provisioned
+        if ($this->invoice->provisioned_at) {
+            Log::info('ProvisionJob skipped, already provisioned', ['invoice_id' => $this->invoice->id]);
+            return;
+        }
+
         // Attempt to provision the resource
         $success = $service->provision($this->invoice);
 
         if ($success) {
             $this->invoice->automation_status = 'provisioned';
+            $this->invoice->provisioned_at = now();
             $this->invoice->save();
             Log::info('ProvisionJob completed', ['invoice_id' => $this->invoice->id]);
         } else {

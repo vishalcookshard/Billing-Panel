@@ -15,6 +15,14 @@ class Audit extends Model
         'meta' => 'array',
     ];
 
+    protected $guarded = [];
+
+    public function user()
+    {
+        return $this->belongsTo(User::class);
+    }
+
+
     public static function log($invoiceId, $event, array $meta = [])
     {
         return static::create(['invoice_id' => $invoiceId, 'event' => $event, 'meta' => $meta]);

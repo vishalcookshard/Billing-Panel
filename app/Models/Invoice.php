@@ -4,10 +4,12 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Invoice extends Model
 {
     use HasFactory;
+    use SoftDeletes;
 
     protected $fillable = [
         'user_id',
@@ -18,11 +20,53 @@ class Invoice extends Model
         'automation_status',
         'grace_notified_at',
         'last_status_at',
+        'paid_at',
+        'idempotency_key',
+        'currency',
+        'provisioned_at',
     ];
 
     protected $casts = [
         'due_date' => 'datetime',
         'grace_notified_at' => 'datetime',
         'last_status_at' => 'datetime',
+        'paid_at' => 'datetime',
+        'provisioned_at' => 'datetime',
     ];
+
+    public const STATUS_PENDING = 'pending';
+    public const STATUS_UNPAID = 'unpaid';
+    public const STATUS_WARNED = 'warned';
+    public const STATUS_GRACE = 'grace';
+    public const STATUS_SUSPENDED = 'suspended';
+    public const STATUS_TERMINATED = 'terminated';
+    public const STATUS_PAID = 'paid';
+
+    public static function statuses(): array
+    {
+        return [
+            self::STATUS_PENDING,
+            self::STATUS_UNPAID,
+            self::STATUS_WARNED,
+            self::STATUS_GRACE,
+            self::STATUS_SUSPENDED,
+            self::STATUS_TERMINATED,
+            self::STATUS_PAID,
+        ];
+    }
+
+    public function isPaid(): bool
+    {
+        return $this->status === self::STATUS_PAID || $this->paid_at !== null;
+    }
+
+    // Prevent mutating core billing fields after payment
+    public function setAttribute($key, $value)
+    {
+        if ($this->exists && $this->isPaid() && in_array($key, ['amount', 'user_id', 'currency', 'service_id'])) {
+            throw new \RuntimeException('Cannot modify immutable invoice fields after payment');
+        }
+
+        return parent::setAttribute($key, $value);
+    }
 }

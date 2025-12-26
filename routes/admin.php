@@ -4,7 +4,7 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Admin\SettingsController;
 use App\Http\Controllers\Admin\PluginsController;
 
-Route::middleware(['auth', 'can:access-admin'])->prefix('admin/api')->group(function () {
+Route::middleware(['auth', 'can:access-admin', 'admin.audit'])->prefix('admin/api')->group(function () {
     Route::get('settings', [SettingsController::class, 'index']);
     Route::get('settings/{key}', [SettingsController::class, 'show']);
     Route::post('settings/{key}', [SettingsController::class, 'update']);
