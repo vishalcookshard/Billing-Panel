@@ -1,4 +1,3 @@
-
 #!/usr/bin/env bash
 # Robust entrypoint: ensure environment is ready and start php-fpm
 set -euo pipefail
