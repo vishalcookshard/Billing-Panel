@@ -24,7 +24,7 @@ class ProvisionJob implements ShouldQueue, ShouldBeUnique
         // Keep job unique for 1 hour to avoid duplicate provisioning
         return 3600;
     }
-{
+
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
     public Invoice $invoice;

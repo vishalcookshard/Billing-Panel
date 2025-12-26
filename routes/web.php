@@ -29,7 +29,7 @@ Route::middleware('auth')->group(function () {
 });
 
 // Admin Routes
-Route::middleware(['auth', 'admin'])->prefix('admin')->group(function () {
+Route::middleware(['auth', 'admin', 'admin.audit', 'throttle:60,1'])->prefix('admin')->group(function () {
     // Pages Management
     Route::resource('pages', AdminPageController::class);
 
@@ -49,7 +49,7 @@ Route::middleware('guest')->group(function () {
     Route::post('/login', function () {
         // Laravel Breeze or custom authentication
         return redirect('/');
-    });
+    })->middleware('throttle:login');
 
     Route::get('/register', function () {
         return view('auth.register');

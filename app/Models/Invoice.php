@@ -34,25 +34,28 @@ class Invoice extends Model
         'provisioned_at' => 'datetime',
     ];
 
-    // Strict lifecycle: unpaid -> warned -> grace -> suspended -> terminated -> paid
+    // Strict lifecycle: draft -> unpaid -> warned -> grace -> paid (terminal)
+    // suspended/terminated are terminal or administrative steps for unpaid accounts
+    public const STATUS_DRAFT = 'draft';
     public const STATUS_PENDING = 'pending'; // legacy
     public const STATUS_UNPAID = 'unpaid';
     public const STATUS_WARNED = 'warned';
     public const STATUS_GRACE = 'grace';
+    public const STATUS_PAID = 'paid';
     public const STATUS_SUSPENDED = 'suspended';
     public const STATUS_TERMINATED = 'terminated';
-    public const STATUS_PAID = 'paid';
 
     public static function statuses(): array
     {
         return [
+            self::STATUS_DRAFT,
             self::STATUS_PENDING,
             self::STATUS_UNPAID,
             self::STATUS_WARNED,
             self::STATUS_GRACE,
+            self::STATUS_PAID,
             self::STATUS_SUSPENDED,
             self::STATUS_TERMINATED,
-            self::STATUS_PAID,
         ];
     }
 
@@ -64,12 +67,14 @@ class Invoice extends Model
     public static function allowedTransitions(): array
     {
         return [
+            self::STATUS_DRAFT => [self::STATUS_UNPAID],
+            self::STATUS_PENDING => [self::STATUS_UNPAID, self::STATUS_PAID],
             self::STATUS_UNPAID => [self::STATUS_WARNED, self::STATUS_PAID],
             self::STATUS_WARNED => [self::STATUS_GRACE, self::STATUS_PAID],
-            self::STATUS_GRACE => [self::STATUS_SUSPENDED, self::STATUS_PAID],
-            self::STATUS_SUSPENDED => [self::STATUS_TERMINATED, self::STATUS_PAID],
+            self::STATUS_GRACE => [self::STATUS_PAID, self::STATUS_SUSPENDED],
+            self::STATUS_SUSPENDED => [self::STATUS_TERMINATED],
             self::STATUS_TERMINATED => [],
-            self::STATUS_PAID => [],
+            self::STATUS_PAID => [], // paid is terminal and immutable
         ];
     }
 
@@ -115,8 +120,16 @@ class Invoice extends Model
         }
 
         // Prevent arbitrary status resets once reached terminal states
-        if ($key === 'status' && $this->exists && $this->status === self::STATUS_PAID && $value !== self::STATUS_PAID) {
-            throw new \RuntimeException('Cannot change status of a paid invoice');
+        if ($key === 'status' && $this->exists) {
+            // disallow changing a paid invoice's status at all
+            if ($this->status === self::STATUS_PAID && $value !== self::STATUS_PAID) {
+                throw new \RuntimeException('Cannot change status of a paid invoice');
+            }
+
+            // enforce allowed transitions
+            if (!$this->canTransitionTo($value)) {
+                throw new \RuntimeException("Invalid status transition from {$this->status} to {$value}");
+            }
         }
 
         return parent::setAttribute($key, $value);

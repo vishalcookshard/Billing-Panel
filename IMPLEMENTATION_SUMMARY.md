@@ -32,6 +32,21 @@ The Billing-Panel has been completely refactored into a **production-ready, Paym
 - Order system with status tracking
 - User authentication and authorization
 - Admin middleware for protected routes
+
+Recent safety improvements (Dec 2025):
+- Refactored billing business logic into services: `InvoiceService`, `PaymentService`, `OrderService`, `ProvisioningService` ✅
+- Enforced invoice lifecycle with strict state machine and immutability for paid invoices ✅
+- Wrapped payment flows in DB transactions and added idempotency for webhooks (stored `webhook_events`) ✅
+- Provisioning made idempotent with locks and job uniqueness to prevent duplicate provisioning ✅
+- All billing automation runs via queues; application fails startup if queues are unavailable in production ✅
+- Docker compose updated with health checks and persistent volumes for Redis; scheduler runs as a dedicated service ✅
+- Implemented RBAC: `roles`, `permissions`, `role_user`, middleware `permission` ✅
+- Added admin audit logs via `admin.audit` middleware ✅
+- Webhook signature verification via plugin interface and Stripe implementation ✅
+- Added rate limiting for webhooks and login endpoints ✅
+- One-command installer (`manage.sh`) improved to wait for worker/scheduler and configure env automatically ✅
+
+These changes make billing flows atomic and robust for production use.
 - Docker containerization
 - Automatic SSL/HTTPS via Caddy
 - One-click installer

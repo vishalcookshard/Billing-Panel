@@ -9,41 +9,25 @@ use Illuminate\Support\Facades\Log;
 
 class PaymentWebhookController extends Controller
 {
-    protected PluginManager $manager;
+    protected \App\Services\Billing\PaymentService $paymentService;
 
-    public function __construct(PluginManager $manager)
+    public function __construct(\App\Services\Billing\PaymentService $paymentService)
     {
-        $this->manager = $manager;
-        $this->manager->discover();
+        $this->paymentService = $paymentService;
     }
 
     public function handle(Request $request, $pluginKey)
     {
-        $meta = $this->manager->get($pluginKey);
-        if (!$meta) {
-            Log::warning('Webhook for unknown plugin', ['plugin' => $pluginKey]);
-            return response()->json(['error' => 'unknown_plugin'], 404);
+        $result = $this->paymentService->handleWebhook($pluginKey, $request);
+
+        if ($result['status'] === 'ok') {
+            return response()->json(['status' => 'ok', 'event_id' => $result['event_id'] ?? null]);
         }
 
-        $class = $meta['class'] ?? null;
-        if (!$class || !class_exists($class)) {
-            Log::warning('Webhook plugin class missing', ['plugin' => $pluginKey]);
-            return response()->json(['error' => 'plugin_missing'], 500);
+        if ($result['status'] === 'ignored') {
+            return response()->json(['status' => 'ignored', 'result' => $result['result'] ?? null], 200);
         }
 
-        $plugin = app($class);
-
-        if (!method_exists($plugin, 'handleWebhook')) {
-            Log::warning('Webhook plugin missing handler', ['plugin' => $pluginKey]);
-            return response()->json(['error' => 'handler_missing'], 500);
-        }
-
-        $result = $plugin->handleWebhook($request);
-
-        if (!empty($result['handled'])) {
-            return response()->json(['status' => 'ok']);
-        }
-
-        return response()->json(['status' => 'ignored', 'message' => $result['message'] ?? null], 200);
+        return response()->json(['status' => 'error', 'message' => $result['message'] ?? null], 400);
     }
 }

@@ -91,6 +91,14 @@ EOF
       echo "Starting queue and scheduler..."
       docker compose up -d worker scheduler
 
+      echo "Waiting for worker and scheduler to be running..."
+      attempt=0
+      until docker compose ps --status running | grep -E "billing-panel-worker|billing-panel-scheduler" >/dev/null 2>&1 || [ $attempt -ge 20 ]; do
+        attempt=$((attempt+1))
+        echo "Waiting for background services to run ($attempt/20)..."
+        sleep 2
+      done
+
       echo "Installation complete. Visit https://$fqdn to access the app."
       ;;
     2)

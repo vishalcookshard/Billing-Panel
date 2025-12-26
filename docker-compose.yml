@@ -83,6 +83,8 @@ services:
     networks:
       - appnet
     restart: unless-stopped
+    volumes:
+      - redis_data:/data
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
@@ -107,12 +109,51 @@ services:
     volumes:
       - ./:/var/www
     depends_on:
-      - redis
-      - db
-      - app
+      redis:
+        condition: service_healthy
+      db:
+        condition: service_healthy
+      app:
+        condition: service_healthy
     networks:
       - appnet
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "php -v >/dev/null 2>&1 || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  scheduler:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: billing-panel-scheduler
+    command: php artisan schedule:work --verbose --no-interaction
+    environment:
+      - APP_ENV=${APP_ENV:-production}
+      - APP_DEBUG=${APP_DEBUG:-false}
+      - DB_HOST=db
+      - DB_DATABASE=${DB_DATABASE:-billing}
+      - DB_USERNAME=${DB_USERNAME:-root}
+      - DB_PASSWORD=${DB_PASSWORD:-secret}
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+    volumes:
+      - ./:/var/www
+    depends_on:
+      db:
+        condition: service_healthy
+      app:
+        condition: service_healthy
+    networks:
+      - appnet
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "php -v >/dev/null 2>&1 || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
   scheduler:
     build:
@@ -142,6 +183,7 @@ volumes:
   db_data:
   caddy_data:
   caddy_config:
+  redis_data:
 
 networks:
   appnet:

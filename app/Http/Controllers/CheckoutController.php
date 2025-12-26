@@ -56,20 +56,11 @@ class CheckoutController extends Controller
         $billingCycle = $request->input('billing_cycle');
         $price = $plan->getPrice($billingCycle);
 
-        // Create an order
-        $order = Order::create([
-            'user_id' => $user->id,
-            'plan_id' => $plan->id,
-            'billing_cycle' => $billingCycle,
-            'amount' => $price,
-            'status' => Order::STATUS_PENDING,
-        ]);
-
-        // TODO: Redirect to payment gateway
-        // For now, mark as active (in production, integrate Stripe/PayPal)
-        $order->update(['status' => Order::STATUS_ACTIVE]);
+        // Create an order and dispatch provisioning via service
+        $orderService = app(\App\Services\Billing\OrderService::class);
+        $order = $orderService->createOrderAndDispatch($user, $plan, $billingCycle, $price);
 
         return redirect()->route('dashboard.orders')
-            ->with('success', "Order placed successfully! You now have access to {$plan->name}.");
+            ->with('success', "Order placed successfully! Provisioning has been queued for {$plan->name}.");
     }
 }

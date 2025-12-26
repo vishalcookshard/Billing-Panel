@@ -14,6 +14,9 @@ interface PaymentGatewayInterface
     // Handle incoming webhook; return array with 'handled' and optional 'invoice_id' or 'message'
     public function handleWebhook(Request $request): array;
 
+    // Optional: verify webhook signature and reject unsigned or invalid requests
+    public function verifyWebhookSignature(Request $request): bool;
+
     // Return config array loaded from DB
     public function config(): array;
 }

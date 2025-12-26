@@ -37,6 +37,53 @@ class ProvisioningService
         return ['success' => true, 'service_id' => 'srv-' . uniqid()];
     }
 
+    /**
+     * Provision resource with a distributed lock to prevent duplicate provisioning
+     */
+    public function provision($invoice): bool
+    {
+        $lockKey = 'provision:invoice:' . $invoice->id;
+        $lock = \Illuminate\Support\Facades\Cache::lock($lockKey, 300);
+
+        if (!$lock->get()) {
+            Log::warning('Could not obtain provisioning lock', ['invoice_id' => $invoice->id]);
+            return false;
+        }
+
+        try {
+            // double-check idempotency
+            if ($invoice->provisioned_at) {
+                Log::info('Invoice already provisioned, skipping', ['invoice_id' => $invoice->id]);
+                return true;
+            }
+
+            $res = $this->createService($invoice);
+
+            if ($res['success'] ?? false) {
+                // Save result (service_id) atomicly
+                \Illuminate\Support\Facades\DB::transaction(function () use ($invoice, $res) {
+                    $inv = \App\Models\Invoice::lockForUpdate()->find($invoice->id);
+                    if (!$inv) throw new \RuntimeException('Invoice disappeared during provisioning');
+
+                    if ($inv->provisioned_at) {
+                        return true;
+                    }
+
+                    $inv->service_id = $res['service_id'] ?? $inv->service_id;
+                    $inv->automation_status = 'provisioned';
+                    $inv->provisioned_at = now();
+                    $inv->save();
+                });
+
+                return true;
+            }
+
+            return false;
+        } finally {
+            $lock->release();
+        }
+    }
+
     public function suspend($invoice): bool
     {
         $meta = $this->pluginForInvoice($invoice);

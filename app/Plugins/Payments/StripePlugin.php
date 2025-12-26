@@ -72,6 +72,19 @@ class StripePlugin implements PaymentGatewayInterface
             return ['handled' => false, 'message' => 'signature_invalid'];
         }
 
+        // expose verification method via the interface
+    }
+
+    public function verifyWebhookSignature(Request $request): bool
+    {
+        $payload = $request->getContent();
+        $sigHeader = $request->header('Stripe-Signature');
+        $config = $this->config();
+        $secret = $config['webhook_secret'] ?? null;
+        if (!$secret) return false;
+        return $this->verifySignature($payload, $sigHeader, $secret);
+    }
+
         $data = json_decode($payload, true);
         if (!$data) {
             Log::warning('Stripe webhook invalid payload');

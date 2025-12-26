@@ -56,6 +56,8 @@ When prompted:
 - Enter your domain (e.g., `billing.example.com`)
 - Confirm the installation
 
+Note: The installer now fully configures the environment, runs migrations, creates an admin account, and starts queues and the scheduler. It will also verify background services (worker and scheduler) are running and that queue connectivity is available in production.
+
 The script will:
 - ✓ Install Docker
 - ✓ Clone the repository

@@ -32,7 +32,7 @@ Route::middleware(['auth'])->group(function () {
 });
 
 // Admin billing actions
-Route::middleware(['auth', 'can:manage-settings'])->prefix('admin')->group(function () {
+Route::middleware(['auth', 'permission:manage-settings'])->prefix('admin')->group(function () {
 	Route::post('users/{user}/wallet/credit', [BillingController::class, 'creditWallet']);
 	Route::post('credit-notes', [BillingController::class, 'issueCredit']);
 	Route::post('invoices/{invoice}/pdf', [BillingController::class, 'invoicePdf']);
