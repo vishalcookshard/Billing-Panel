@@ -4,8 +4,18 @@ A modern, production-ready billing and hosting management system built with Lara
 
 ## 🚀 One-Line Installation (VM/Server)
 
+The installer will ask only for your FQDN (e.g. billing.example.com).
+
+Interactive (recommended):
+
 ```bash
-curl -sSL https://raw.githubusercontent.com/isthisvishal/Billing-Panel/main/install.sh | bash
+curl -sSL https://raw.githubusercontent.com/isthisvishal/Billing-Panel/main/scripts/one-command-install.sh | bash -s --
+```
+
+Non-interactive (provide FQDN):
+
+```bash
+bash -c "$(curl -sSL https://raw.githubusercontent.com/isthisvishal/Billing-Panel/main/scripts/one-command-install.sh)" billing.example.com
 ```
 
 ## ✨ Features
@@ -46,8 +56,22 @@ curl -sSL https://raw.githubusercontent.com/isthisvishal/Billing-Panel/main/inst
 
 ### One-Command Installation
 
+Run the bundled installer which will prompt for your domain (FQDN):
+
 ```bash
-sudo bash <(curl -fsSL https://raw.githubusercontent.com/isthisvishal/Billing-Panel/main/scripts/manage.sh)
+sudo bash scripts/one-command-install.sh
+```
+
+Or run remotely in one line (interactive prompt for FQDN):
+
+```bash
+curl -sSL https://raw.githubusercontent.com/isthisvishal/Billing-Panel/main/scripts/one-command-install.sh | sudo bash -s --
+```
+
+To run non-interactively provide the FQDN as the first argument:
+
+```bash
+sudo bash scripts/one-command-install.sh billing.example.com
 ```
 
 ### System Requirements
