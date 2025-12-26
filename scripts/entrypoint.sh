@@ -24,8 +24,11 @@ fi
 
 # Run composer install (no-scripts to avoid side effects)
 if [ ! -f vendor/autoload.php ]; then
+  log "Preparing environment for composer..."
+  git config --global --add safe.directory /var/www || log "git safe.directory config failed"
+  export COMPOSER_ALLOW_SUPERUSER=1
   log "Running composer install..."
-  composer install --no-interaction --no-scripts --optimize-autoloader || fatal "Composer install failed"
+  COMPOSER_ALLOW_SUPERUSER=1 composer install --no-interaction --no-scripts --optimize-autoloader || fatal "Composer install failed"
 fi
 
 # Generate APP_KEY if missing
