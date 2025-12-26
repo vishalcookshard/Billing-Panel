@@ -31,13 +31,13 @@ Route::middleware('auth')->group(function () {
 // Admin Routes
 Route::middleware(['auth', 'admin', 'admin.audit', 'throttle:60,1'])->prefix('admin')->group(function () {
     // Pages Management
-    Route::resource('pages', AdminPageController::class);
+    Route::resource('pages', AdminPageController::class)->middleware('permission:manage-pages');
 
     // Categories Management
-    Route::resource('categories', ServiceCategoryController::class);
+    Route::resource('categories', ServiceCategoryController::class)->middleware('permission:manage-categories');
 
     // Plans Management
-    Route::resource('plans', PlanController::class);
+    Route::resource('plans', PlanController::class)->middleware('permission:manage-plans');
 });
 
 // Authentication Routes

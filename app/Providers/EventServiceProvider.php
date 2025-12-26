@@ -37,5 +37,8 @@ class EventServiceProvider extends ServiceProvider
     public function boot()
     {
         parent::boot();
+
+        // Listen for queue failures and notify admins
+        $this->app['events']->listen(\Illuminate\Queue\Events\JobFailed::class, \App\Listeners\NotifyAdminsOnJobFailed::class);
     }
 }

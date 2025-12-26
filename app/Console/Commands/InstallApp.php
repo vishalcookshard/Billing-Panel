@@ -23,11 +23,14 @@ class InstallApp extends Command
 
         $user = User::firstOrCreate(['email' => $email], ['name' => 'Admin', 'password' => bcrypt($password), 'is_admin' => true]);
 
-        // Create basic RBAC scaffolding
-        $adminRole = \App\Models\Role::firstOrCreate(['name' => 'admin'], ['label' => 'Administrator']);
-        $manageSettings = \App\Models\Permission::firstOrCreate(['name' => 'manage-settings'], ['label' => 'Manage Settings']);
-        $adminRole->permissions()->syncWithoutDetaching([$manageSettings->id]);
-        $user->roles()->syncWithoutDetaching([$adminRole->id]);
+        // Create basic RBAC scaffolding and seed standard permissions
+        $this->call('db:seed', ['--class' => \Database\Seeders\RbacSeeder::class]);
+
+        // Attach admin role to the created admin user
+        $adminRole = \App\Models\Role::where('name', 'admin')->first();
+        if ($adminRole) {
+            $user->roles()->syncWithoutDetaching([$adminRole->id]);
+        }
 
         $this->info('Admin user created and granted admin role: ' . $user->email);
 

@@ -15,8 +15,8 @@ class InvoiceAutomationTest extends TestCase
 
         $invoice = Invoice::factory()->create(['status' => 'pending']);
 
-        $invoice->status = 'paid';
-        $invoice->save();
+        $service = app(\App\Services\Billing\InvoiceService::class);
+        $service->markPaid($invoice, [], 'test-evt');
 
         Event::assertDispatched(InvoicePaid::class);
     }
