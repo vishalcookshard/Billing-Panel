@@ -15,8 +15,6 @@ class Audit extends Model
         'meta' => 'array',
     ];
 
-    protected $guarded = [];
-
     public function user()
     {
         return $this->belongsTo(User::class);
