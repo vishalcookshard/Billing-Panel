@@ -7,6 +7,7 @@ return [
     'providers' => [
         App\Providers\AppServiceProvider::class,
         App\Providers\EventServiceProvider::class,
+        App\Providers\FrameworkServiceProvider::class,
         App\Providers\PluginServiceProvider::class,
     ],
 ];
