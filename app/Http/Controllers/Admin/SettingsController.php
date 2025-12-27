@@ -22,8 +22,13 @@ class SettingsController extends Controller
     {
         $this->authorize('manage-settings');
 
-        $value = $request->input('value');
-        $encrypted = (bool)$request->input('encrypted', false);
+        $validated = $request->validate([
+            'value' => 'nullable|string|max:2000',
+            'encrypted' => 'boolean',
+        ]);
+
+        $value = $validated['value'] ?? null;
+        $encrypted = (bool)($validated['encrypted'] ?? false);
 
         $setting = AdminSetting::updateOrCreate(['key' => $key], ['value' => $encrypted ? encrypt($value) : $value, 'encrypted' => $encrypted]);
 
