@@ -2,40 +2,72 @@
 
 namespace App\Listeners;
 
+
 use Illuminate\Queue\Events\JobFailed;
-use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Support\Facades\Log;
-use App\Notifications\AdminJobFailedNotification;
-use App\Models\User;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Mail;
 
 class NotifyAdminsOnJobFailed
 {
     public function handle(JobFailed $event)
     {
-        try {
-            // Detailed logging with exception information
-            $payload = [];
-            try {
-                $payload = $event->job->payload() ?? [];
-            } catch (\Throwable $e) {
-                // ignore payload extraction errors
-            }
+        $jobName = method_exists($event->job, 'getName') ? $event->job->getName() : (method_exists($event->job, 'resolveName') ? $event->job->resolveName() : 'unknown');
+        $exception = $event->exception->getMessage();
 
-            Log::error('Job failed', [
-                'connection' => $event->connectionName,
-                'job' => method_exists($event->job, 'getName') ? $event->job->getName() : 'unknown',
-                'exception' => $event->exception->getMessage(),
-                'payload' => $payload,
-            ]);
+        Log::error('Job Failed', [
+            'job' => $jobName,
+            'exception' => $exception,
+            'connection' => $event->connectionName,
+        ]);
 
-            // Notify admins immediately (synchronous) to avoid missing alerts when queue workers fail
-            $admins = User::where('is_admin', true)->get();
-            foreach ($admins as $admin) {
-                // Use notifyNow to send synchronously
-                $admin->notifyNow(new AdminJobFailedNotification($event));
-            }
-        } catch (\Throwable $e) {
-            Log::critical('Failed to notify admins about job failure: ' . $e->getMessage(), ['original_exception' => $event->exception->getMessage() ?? null]);
+        // Discord notification
+        if (config('notifications.channels.discord.enabled')) {
+            $this->notifyDiscord($jobName, $exception);
         }
+
+        // Email notification
+        if (config('notifications.channels.email.enabled')) {
+            $this->notifyEmail($jobName, $exception);
+        }
+
+        // Slack notification
+        if (config('notifications.channels.slack.enabled')) {
+            $this->notifySlack($jobName, $exception);
+        }
+    }
+
+    private function notifyDiscord($jobName, $exception)
+    {
+        $webhookUrl = config('notifications.channels.discord.webhook_url');
+        if (empty($webhookUrl)) return;
+
+        Http::post($webhookUrl, [
+            'content' => "⚠️ **Job Failed**: `{$jobName}`\n```{$exception}```"
+        ]);
+    }
+
+    private function notifyEmail($jobName, $exception)
+    {
+        $recipients = config('notifications.channels.email.recipients');
+        foreach ($recipients as $recipient) {
+            Mail::raw(
+                "Job Failed: {$jobName}\n\nException: {$exception}",
+                function ($message) use ($recipient, $jobName) {
+                    $message->to($recipient)
+                        ->subject("Job Failed: {$jobName}");
+                }
+            );
+        }
+    }
+
+    private function notifySlack($jobName, $exception)
+    {
+        $webhookUrl = config('notifications.channels.slack.webhook_url');
+        if (empty($webhookUrl)) return;
+
+        Http::post($webhookUrl, [
+            'text' => "⚠️ Job Failed: `{$jobName}`\n```{$exception}```"
+        ]);
     }
 }

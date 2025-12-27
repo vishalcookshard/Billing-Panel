@@ -20,6 +20,7 @@
                     <div class="card plan-card">
                         <div class="card-body">
                             @if($category->icon)
+                                {{-- Safe: icon_safe is sanitized by SafeHtml rule in ServiceCategory model --}}
                                 <div style="font-size: 3rem; margin-bottom: 15px;">
                                     {!! $category->icon_safe !!}
                                 </div>

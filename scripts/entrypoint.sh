@@ -46,6 +46,11 @@ if ! grep -q "^APP_KEY=" .env || grep -q "^APP_KEY=$" .env; then
   php -r 'file_exists(".env") || copy(".env.example", ".env"); $env = file_get_contents(".env"); if (!preg_match("/^APP_KEY=.+/m", $env)) { file_put_contents(".env", rtrim($env, "\n") . "\nAPP_KEY=base64:" . base64_encode(random_bytes(32)) . "\n"); }' || fatal "Failed to generate APP_KEY"
 fi
 
+
+# Validate environment before running migrations
+log "Validating environment..."
+php artisan env:validate || fatal "Environment validation failed."
+
 # Run artisan commands (package:discover removed from composer scripts to avoid binding errors)
 if [ "${APP_ENV:-}" != "testing" ]; then
   log "Running migrations..."

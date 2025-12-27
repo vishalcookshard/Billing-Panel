@@ -1,3 +1,9 @@
+    public function test_db_prevents_deleting_paid_invoice()
+    {
+        $invoice = Invoice::factory()->create(['status' => Invoice::STATUS_PAID, 'amount' => 100]);
+        $this->expectException(\Illuminate\Database\QueryException::class);
+        $invoice->delete();
+    }
 <?php
 
 namespace Tests\Unit;

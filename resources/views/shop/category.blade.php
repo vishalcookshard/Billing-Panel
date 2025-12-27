@@ -27,6 +27,7 @@
             </div>
             <div class="col-md-4 text-md-end">
                         @if($category->icon_safe)
+                    {{-- Safe: icon_safe is sanitized by SafeHtml rule in ServiceCategory model --}}
                     <div style="font-size: 4rem;">
                         {!! $category->icon_safe !!}
                     </div>

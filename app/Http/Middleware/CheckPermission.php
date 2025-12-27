@@ -11,13 +11,19 @@ class CheckPermission
     {
         $user = auth()->user();
         if (!$user) {
-            return redirect('/')->with('error', 'Unauthorized');
+            return redirect()->route('login')->with('error', 'Please login first');
         }
 
-        if ($user->hasPermission($permission) || $user->is_admin) {
+        // Super admin bypass
+        if ($user->is_admin && $user->email === env('SUPER_ADMIN_EMAIL', 'admin@example.com')) {
             return $next($request);
         }
 
-        return redirect('/')->with('error', 'Insufficient permissions');
+        // Check permission
+        if (!$user->hasPermission($permission)) {
+            abort(403, 'Unauthorized action.');
+        }
+
+        return $next($request);
     }
 }

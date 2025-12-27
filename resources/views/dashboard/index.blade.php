@@ -4,6 +4,13 @@
 
 @section('content')
 <div class="container mt-5">
+    @if(Auth::user() && Auth::user()->password_change_required)
+    <div class="alert alert-danger alert-dismissible fade show" role="alert">
+        <strong>Security Warning!</strong> You are using default credentials. 
+        <a href="{{ route('password.change') }}" class="alert-link">Change your password now</a>.
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+    @endif
     <div class="row">
         <div class="col-md-3">
             <!-- Sidebar -->

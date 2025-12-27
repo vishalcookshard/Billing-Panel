@@ -25,6 +25,7 @@
                 <article>
                     <h1>{{ $page->title }}</h1>
                     <hr>
+                    {{-- Safe: Content sanitized by HTMLPurifier in Page model --}}
                     <div class="page-content" style="line-height: 1.8; color: #555;">
                         {!! $page->content !!}
                     </div>

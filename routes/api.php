@@ -56,7 +56,7 @@ Route::get('health', function (\Illuminate\Http\Request $request) {
 })->middleware('throttle:health');
 
 // Billing API: requires authentication and rate limiting
-Route::middleware(['auth','throttle:60,1'])->group(function () {
+Route::middleware(['auth','throttle.api'])->group(function () {
 	Route::post('invoices/{invoice}/apply-promo', [BillingController::class, 'applyPromo']);
 	Route::get('users/{user}/wallet', [BillingController::class, 'wallet']);
 });

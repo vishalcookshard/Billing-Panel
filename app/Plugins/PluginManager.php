@@ -1,3 +1,17 @@
+use App\Plugins\PluginValidator;
+    public function register(string $pluginClass): void
+    {
+        $validator = new PluginValidator();
+        $errors = $validator->validate($pluginClass);
+        if (!empty($errors)) {
+            Log::error('Plugin validation failed', [
+                'plugin' => $pluginClass,
+                'errors' => $errors
+            ]);
+            throw new \RuntimeException('Plugin validation failed: ' . implode(', ', $errors));
+        }
+        // Continue with registration...
+    }
 <?php
 
 namespace App\Plugins;

@@ -1,3 +1,9 @@
+use App\Http\Controllers\PasswordChangeController;
+// Password Change Routes
+Route::middleware('auth')->group(function () {
+    Route::get('/password/change', [PasswordChangeController::class, 'show'])->name('password.change');
+    Route::post('/password/change', [PasswordChangeController::class, 'update']);
+});
 <?php
 
 use Illuminate\Support\Facades\Route;
@@ -29,7 +35,7 @@ Route::middleware('auth')->group(function () {
 });
 
 // Admin Routes
-Route::middleware(['auth', 'admin', 'admin.audit', 'throttle:60,1'])->prefix('admin')->group(function () {
+Route::middleware(['auth', 'admin', 'admin.audit', 'throttle:' . config('rate-limiting.api.max_attempts') . ',' . config('rate-limiting.api.decay_minutes')])->prefix('admin')->group(function () {
     // Pages Management
     Route::resource('pages', AdminPageController::class)->middleware('permission:manage-pages');
 
