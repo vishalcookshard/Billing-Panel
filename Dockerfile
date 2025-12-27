@@ -42,15 +42,24 @@ COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 # Install redis extension
 RUN pecl install redis && docker-php-ext-enable redis
 
-# Install composer deps (production)
-RUN composer install --no-dev --prefer-dist --optimize-autoloader --no-interaction || true
+# Create a dedicated non-root user for the application
+ARG APP_USER=app
+ARG APP_UID=1000
+ARG APP_GID=1000
+RUN groupadd -g ${APP_GID} ${APP_USER} || true \
+  && useradd -m -u ${APP_UID} -g ${APP_GID} -s /bin/bash ${APP_USER} || true
 
-# Set working directory
+# Set working directory early
 WORKDIR /var/www
 
+# Copy composer files and install deps (production)
+COPY composer.json composer.lock* /var/www/
+RUN chown -R ${APP_USER}:${APP_USER} /var/www \
+  && export COMPOSER_ALLOW_SUPERUSER=1 \
+  && composer install --no-dev --prefer-dist --optimize-autoloader --no-interaction
 
-# Copy the entire Laravel application (including artisan)
-COPY . /var/www
+# Copy the rest of the application as app user
+COPY --chown=${APP_USER}:${APP_USER} . /var/www
 
 # Copy entrypoint script
 COPY scripts/entrypoint.sh /usr/local/bin/entrypoint.sh
@@ -65,6 +74,9 @@ EXPOSE 9000
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
     CMD php -v || exit 1
+
+# Run as non-root user
+USER ${APP_USER}:${APP_USER}
 
 # Entrypoint only (php-fpm is run by entrypoint script)
 ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]

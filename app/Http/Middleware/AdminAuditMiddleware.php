@@ -24,12 +24,13 @@ class AdminAuditMiddleware
                         'user_id' => $user->id,
                         'event' => 'admin_action',
                         'action' => $request->method() . ' ' . $request->path(),
-                        'meta' => json_encode(['payload' => $request->except(['password', '_token'])]),
+                        'meta' => json_encode(['payload' => $request->except(['password', '_token', 'credit_card', 'card_number', 'cvv'])]),
                     ]);
                 }
             }
         } catch (\Throwable $e) {
-            // swallow to avoid breaking admin actions
+            // Log audit middleware failures instead of failing silently
+            \Log::error('AdminAuditMiddleware failed: ' . $e->getMessage());
         }
 
         return $response;

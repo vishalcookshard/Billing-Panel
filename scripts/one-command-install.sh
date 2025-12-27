@@ -17,12 +17,52 @@ ARG2="${2:-}"
 FQDN="${FQDN:-${ARG2:-}}"
 AUTO_YES="${YES:-0}"
 
-echo "Billing-Panel one-command script (action=$ACTION)"
+log() { echo "[installer] $*"; }
+error_exit() { echo "[installer][ERROR] $*" >&2; rollback; exit 1; }
+trap 'on_error ${LINENO} ${?}' ERR
+on_error() {
+  rc=${2:-1}
+  echo "[installer][ERROR] Error at line ${1:-unknown}, code ${rc}. Initiating rollback." >&2
+  rollback
+  exit ${rc}
+}
 
-if ! command -v docker >/dev/null 2>&1; then
-  echo "Docker is required. Please install Docker and docker-compose." >&2
-  exit 1
+# Prevent running unverified piped installs by default
+if [ -z "${ALLOW_PIPED_INSTALL:-}" ] && [ ! -t 0 ]; then
+  echo "Refusing to run directly from pipe for safety. Download the script and verify its checksum before running." >&2
+  echo "See README.md for verification instructions." >&2
+  exit 2
 fi
+
+log "Billing-Panel one-command script (action=$ACTION)"
+
+# OS detection (only Debian/Ubuntu supported)
+if [ -f /etc/os-release ]; then
+  . /etc/os-release
+  case "${ID:-}" in
+    ubuntu|debian) : ;;
+    *) error_exit "Unsupported OS: ${ID}. Supported: ubuntu, debian." ;;
+  esac
+else
+  error_exit "Cannot detect OS. Aborting."
+fi
+
+# Verify docker daemon is running
+if ! docker info >/dev/null 2>&1; then
+  error_exit "Docker daemon does not appear to be running. Start Docker and retry (e.g., 'sudo systemctl start docker')."
+fi
+
+# Simple FQDN validation (allow localhost for testing)
+validate_fqdn() {
+  local fqdn="$1"
+  if [ "${fqdn}" = "localhost" ]; then
+    return 0
+  fi
+  if ! echo "$fqdn" | grep -Eq '^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$'; then
+    return 1
+  fi
+  return 0
+}
 
 confirm() {
   local prompt="$1"
@@ -57,46 +97,58 @@ set_app_url() {
   fi
 }
 
-wait_for_app_healthy() {
-  echo "Bringing up containers (build if needed)..."
-  docker compose up -d --build
+ACTIONS_PERFORMED=()
+record_action() {
+  ACTIONS_PERFORMED+=("$1")
+}
 
-  echo "Waiting for app container to become healthy (timeout 120s)..."
+wait_for_app_healthy() {
+  log "Bringing up containers (build if needed)..."
+  docker compose up -d --build
+  record_action "compose_up"
+
+  log "Waiting for app container to become healthy (timeout 120s)..."
   CONTAINER_ID=$(docker compose ps -q app || true)
   if [ -z "$CONTAINER_ID" ]; then
-    echo "Unable to find app container; continuing and attempting to run migrations anyway."
-    return
+    error_exit "Unable to find app container after compose up. Aborting."
   fi
 
   for i in $(seq 1 60); do
     STATUS=$(docker inspect -f '{{.State.Health.Status}}' "$CONTAINER_ID" 2>/dev/null || echo "unknown")
     if [ "$STATUS" = "healthy" ]; then
-      echo "App container healthy"
+      log "App container healthy"
       return
     fi
-    echo "Waiting for app (status=$STATUS), retrying..."
+    log "Waiting for app (status=$STATUS), retrying..."
     sleep 2
   done
-  echo "Warning: app container did not report healthy within timeout. Continuing..."
+  error_exit "App container did not report healthy within timeout."
 }
 
 run_migrations_and_seed() {
-  echo "Running migrations and seeding inside app container..."
-  # tolerate failures (some optional packages may not be present during first-run)
-  docker compose exec -T app php artisan migrate --force || true
-  docker compose exec -T app php artisan db:seed --force || true
+  log "Running migrations inside app container (no silent failures)..."
+  docker compose exec -T app php artisan migrate --force
+  log "Running database seeds..."
+  docker compose exec -T app php artisan db:seed --force
+  record_action "migrations_and_seed"
 }
 
 install() {
   prompt_fqdn_if_missing
-  echo "Using FQDN: $FQDN"
+  if ! validate_fqdn "$FQDN"; then
+    error_exit "Invalid FQDN provided: $FQDN"
+  fi
+  log "Using FQDN: $FQDN"
+
+  # If services exist, optionally stop and remove
   if docker compose ps -q | grep -q .; then
-    echo "Existing compose services detected."
-    if confirm "An existing installation appears to be present. Do you want to stop and remove existing containers/volumes before installing (destructive)?"; then
-      echo "Stopping and removing existing compose stack and named volumes..."
-      docker compose down --volumes --remove-orphans || true
+    log "Existing compose services detected."
+    if confirm "An existing installation appears to be present. Stop and remove existing containers/volumes before installing (destructive)?"; then
+      log "Stopping and removing existing compose stack and named volumes..."
+      docker compose down --volumes --remove-orphans
+      record_action "compose_down"
     else
-      echo "Skipping removal of existing stack. Proceeding with install (may upgrade or cause conflicts)."
+      log "Skipping removal of existing stack. Proceeding with install (may upgrade or cause conflicts)."
     fi
   fi
 
@@ -110,13 +162,27 @@ install() {
   echo "Admin user: admin@example.com / password (change immediately)"
 }
 
+rollback() {
+  log "Rollback: cleaning up resources..."
+  # Stop compose if it was started
+  if printf '%s\n' "${ACTIONS_PERFORMED[@]:-}" | grep -q "compose_up"; then
+    log "Stopping compose stack..."
+    docker compose down --volumes --remove-orphans || log "Failed to fully remove compose stack during rollback"
+  fi
+  # If migrations were applied, do not attempt to revert automatically; warn the operator
+  if printf '%s\n' "${ACTIONS_PERFORMED[@]:-}" | grep -q "migrations_and_seed"; then
+    log "Migrations were applied before failure. Manual intervention may be required to revert database changes."
+  fi
+  log "Rollback complete."
+}
+
 uninstall() {
   echo "Uninstall will stop the stack and remove containers and named volumes. Back up any data first."
   if ! confirm "Are you sure you want to uninstall and delete volumes? This cannot be undone."; then
     echo "Uninstall aborted by user."; return
   fi
   echo "Stopping and removing compose stack and named volumes..."
-  docker compose down --volumes --remove-orphans || true
+  docker compose down --volumes --remove-orphans
   echo "Uninstall complete."
 }
 

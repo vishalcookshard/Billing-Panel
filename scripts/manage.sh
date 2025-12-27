@@ -217,6 +217,13 @@ install_billing_panel() {
   # Create .env
   info "Configuring environment..."
   local app_key=$(openssl rand -base64 32)
+  # Generate strong DB credentials: non-root application user and a separate root password
+  local db_app_user="billing"
+  local db_app_password
+  db_app_password=$(openssl rand -base64 18 | tr -dc 'A-Za-z0-9' | cut -c1-20)
+  local db_root_password
+  db_root_password=$(openssl rand -base64 18 | tr -dc 'A-Za-z0-9' | cut -c1-20)
+
   cat > .env <<EOF
 APP_NAME="Billing Panel"
 APP_ENV=production
@@ -228,8 +235,9 @@ DB_CONNECTION=mysql
 DB_HOST=db
 DB_PORT=3306
 DB_DATABASE=billing
-DB_USERNAME=root
-DB_PASSWORD=secret
+DB_USERNAME=$db_app_user
+DB_PASSWORD=$db_app_password
+DB_ROOT_PASSWORD=$db_root_password
 
 QUEUE_CONNECTION=redis
 REDIS_HOST=redis
@@ -237,6 +245,8 @@ REDIS_PORT=6379
 
 MAIL_MAILER=log
 EOF
+
+  success ".env file created (DB user: $db_app_user). Store DB_ROOT_PASSWORD securely."
   success ".env file created"
   
   # Create Caddyfile (it's in .gitignore, so we generate it)

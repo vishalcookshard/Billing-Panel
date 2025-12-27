@@ -25,7 +25,7 @@ class CreditService
                 'status' => 'issued',
             ]);
 
-            Audit::log($invoice?->id ?? null, 'credit_issued', ['credit_note_id' => $cn->id, 'amount' => $cn->amount]);
+            Audit::log($invoice?->id ?? null, 'credit_issued', ['credit_note_id' => $cn->id, 'amount' => $cn->amount, 'actor_id' => auth()->id() ?? null]);
 
             return $cn;
         });

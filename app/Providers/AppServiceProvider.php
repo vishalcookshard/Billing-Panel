@@ -70,6 +70,17 @@ class AppServiceProvider extends ServiceProvider
                 if (!empty($missing)) {
                     throw new \RuntimeException('Missing required environment variables for production: ' . implode(', ', $missing));
                 }
+
+                // Ensure APP_KEY is strong (base64: with length >= 44)
+                $appKey = env('APP_KEY');
+                if (!preg_match('/^base64:[A-Za-z0-9+\/=]{43,}$/', $appKey)) {
+                    throw new \RuntimeException('APP_KEY is missing or not a valid base64 key. Generate one with php artisan key:generate');
+                }
+
+                // Prevent using root DB user in production
+                if (strtolower(env('DB_USERNAME', '')) === 'root') {
+                    throw new \RuntimeException('DB_USERNAME is set to root in production. Use a dedicated non-root database user with minimal privileges.');
+                }
             }
         });
     }

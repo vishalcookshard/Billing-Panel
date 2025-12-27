@@ -35,8 +35,10 @@ class BillingController extends Controller
     public function creditWallet(Request $request, User $user, WalletService $walletService)
     {
         $this->authorize('manage-settings');
-        $request->validate(['amount' => 'required|numeric']);
+        $request->validate(['amount' => 'required|numeric|min:0.01']);
         $wallet = $walletService->credit($user, (float)$request->input('amount'), $request->input('currency', 'USD'));
+        // Audit the admin credit action
+        \App\Models\Audit::log(null, 'admin.credit_wallet', ['user_id' => $user->id, 'amount' => (float)$request->input('amount'), 'currency' => $request->input('currency', 'USD'), 'actor_id' => auth()->id()]);
         return response()->json(['success' => true, 'balance' => (string)$wallet->balance]);
     }
 

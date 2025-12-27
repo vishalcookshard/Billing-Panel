@@ -7,7 +7,10 @@ A modern, production-ready billing and hosting management system built with Lara
 Run this single command to install the panel. The script is interactive and will ask for your FQDN and confirm any destructive actions:
 
 ```bash
-curl -sSL https://raw.githubusercontent.com/isthisvishal/Billing-Panel/main/scripts/one-command-install.sh | sudo bash -s -- install
+# Download, verify checksum, then run locally (recommended):
+curl -fsSL -o one-command-install.sh https://raw.githubusercontent.com/isthisvishal/Billing-Panel/main/scripts/one-command-install.sh
+curl -fsSL -o one-command-install.sh.sha256 https://raw.githubusercontent.com/isthisvishal/Billing-Panel/main/scripts/one-command-install.sh.sha256
+sha256sum --check one-command-install.sh.sha256 && sudo bash one-command-install.sh install
 ```
 
 ### Manual installation (step-by-step)
@@ -50,7 +53,10 @@ sudo docker compose exec -T app php artisan db:seed --force
 To uninstall (stops and removes containers and named volumes):
 
 ```bash
-curl -sSL https://raw.githubusercontent.com/isthisvishal/Billing-Panel/main/scripts/one-command-install.sh | sudo bash -s -- uninstall
+# Download, verify checksum, then run locally (recommended):
+curl -fsSL -o one-command-install.sh https://raw.githubusercontent.com/isthisvishal/Billing-Panel/main/scripts/one-command-install.sh
+curl -fsSL -o one-command-install.sh.sha256 https://raw.githubusercontent.com/isthisvishal/Billing-Panel/main/scripts/one-command-install.sh.sha256
+sha256sum --check one-command-install.sh.sha256 && sudo bash one-command-install.sh uninstall
 ```
 
 (Use `YES=1` environment variable to auto-confirm in non-interactive environments.)
@@ -99,9 +105,10 @@ Run the bundled installer which will prompt for your domain (FQDN) and ask for c
 Interactive install (recommended):
 
 ```bash
-sudo bash scripts/one-command-install.sh
-# or
-curl -sSL https://raw.githubusercontent.com/isthisvishal/Billing-Panel/main/scripts/one-command-install.sh | sudo bash -s -- install
+# Download & verify, then run locally (recommended):
+curl -fsSL -o one-command-install.sh https://raw.githubusercontent.com/isthisvishal/Billing-Panel/main/scripts/one-command-install.sh
+curl -fsSL -o one-command-install.sh.sha256 https://raw.githubusercontent.com/isthisvishal/Billing-Panel/main/scripts/one-command-install.sh.sha256
+sha256sum --check one-command-install.sh.sha256 && sudo bash one-command-install.sh install
 ```
 
 Non-interactive install (provide FQDN):

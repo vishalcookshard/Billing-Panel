@@ -27,10 +27,14 @@ class AdminJobFailedNotification extends Notification
     {
         $job = method_exists($this->event->job, 'getName') ? $this->event->job->getName() : 'Unknown';
         $connection = $this->event->connectionName ?? 'unknown';
+        $exception = $this->event->exception ?? null;
+        $exceptionMessage = $exception ? (is_object($exception) && method_exists($exception, 'getMessage') ? $exception->getMessage() : (string)$exception) : 'n/a';
+
         $message = (new MailMessage)
             ->error()
             ->subject("[BillingPanel] Queue job failed: {$job}")
             ->line("A background job failed on connection {$connection}.")
+            ->line("Exception: {$exceptionMessage}")
             ->line('Check logs and failed jobs: php artisan queue:failed')
             ->line('This is an automated notification.');
 

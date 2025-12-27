@@ -9,12 +9,21 @@ cd /var/www || fatal "Could not cd to /var/www"
 
 # Prepare directories
 for dir in storage/logs storage/framework/views storage/framework/cache bootstrap/cache; do
-  mkdir -p "$dir" || log "Could not create $dir (non-fatal)"
+  mkdir -p "$dir" || fatal "Could not create $dir"
 done
 
-# Set permissions
-chown -R www-data:www-data storage bootstrap/cache 2>/dev/null || log "chown failed (non-fatal)"
-chmod -R 775 storage bootstrap/cache 2>/dev/null || log "chmod failed (non-fatal)"
+# Set permissions safely. Only chown when running as root, otherwise verify writability
+if [ "$(id -u)" -eq 0 ]; then
+  chown -R app:app storage bootstrap/cache || fatal "chown failed"
+else
+  # Verify directories are writable by the current user
+  for dir in storage bootstrap/cache; do
+    if [ ! -w "$dir" ]; then
+      fatal "Directory $dir is not writable by the container user (uid=$(id -u)). Ensure volume owner/permissions are correct." 
+    fi
+  done
+fi
+chmod -R 775 storage bootstrap/cache || fatal "chmod failed"
 
 # Ensure .env exists
 if [ ! -f .env ]; then

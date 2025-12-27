@@ -3,6 +3,10 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      args:
+        - APP_USER=app
+        - APP_UID=1000
+        - APP_GID=1000
     container_name: billing-panel-app
     environment:
       - APP_ENV=${APP_ENV:-production}
@@ -13,13 +17,13 @@ services:
       - DB_HOST=db
       - DB_PORT=3306
       - DB_DATABASE=${DB_DATABASE:-billing}
-      - DB_USERNAME=${DB_USERNAME:-root}
+      - DB_USERNAME=${DB_USERNAME:-billing}
       - DB_PASSWORD=${DB_PASSWORD:-secret}
       - QUEUE_CONNECTION=${QUEUE_CONNECTION:-redis}
       - REDIS_HOST=redis
       - REDIS_PORT=6379
     volumes:
-      - ./:/var/www
+      - ./:/var/www:delegated
       - /var/www/node_modules
       - /var/www/vendor
     depends_on:
@@ -29,7 +33,12 @@ services:
         condition: service_healthy
     networks:
       - appnet
-    restart: unless-stopped
+    restart: on-failure
+    deploy:
+      resources:
+        limits:
+          cpus: '0.50'
+          memory: 512M
     healthcheck:
       test: ["CMD-SHELL", "wget --spider --quiet ${APP_URL:-http://localhost}/api/health || exit 1"]
       interval: 30s
@@ -45,6 +54,7 @@ services:
       - "443:443"
     environment:
       - APP_HOST=${APP_HOST:-localhost}
+      - ACME_EMAIL=${ACME_EMAIL:-}
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - ./public:/var/www/public:ro
@@ -54,35 +64,53 @@ services:
       - app
     networks:
       - appnet
-    restart: unless-stopped
+    restart: on-failure
+    deploy:
+      resources:
+        limits:
+          cpus: '0.25'
+          memory: 128M
+    healthcheck:
+      test: ["CMD-SHELL", "caddy list-modules >/dev/null 2>&1 || exit 1"]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
 
   db:
     image: mariadb:10.11
     container_name: billing-panel-db
     environment:
-      MYSQL_ROOT_PASSWORD: ${DB_PASSWORD:-secret}
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:-secret}
       MYSQL_DATABASE: ${DB_DATABASE:-billing}
+      MYSQL_USER: ${DB_USERNAME:-billing}
+      MYSQL_PASSWORD: ${DB_PASSWORD:-secret}
       MARIADB_AUTO_UPGRADE: 1
       MARIADB_DISABLE_UPGRADE_BACKUP: 1
     volumes:
       - db_data:/var/lib/mysql
     networks:
       - appnet
-    restart: unless-stopped
+    restart: on-failure
     healthcheck:
-      test: ["CMD-SHELL", "mysqladmin ping -h localhost -u root -p\"${DB_PASSWORD:-secret}\" >/dev/null 2>&1 || exit 1"]
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -u ${MYSQL_USER:-billing} -p\"${MYSQL_PASSWORD:-secret}\" >/dev/null 2>&1 || exit 1"]
       interval: 10s
       timeout: 10s
       retries: 10
       start_period: 60s
     command: --default-authentication-plugin=mysql_native_password --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+    deploy:
+      resources:
+        limits:
+          cpus: '0.50'
+          memory: 512M
 
   redis:
     image: redis:7-alpine
     container_name: billing-panel-redis
     networks:
       - appnet
-    restart: unless-stopped
+    restart: on-failure
     volumes:
       - redis_data:/data
     healthcheck:
@@ -90,24 +118,30 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    deploy:
+      resources:
+        limits:
+          cpus: '0.25'
+          memory: 128M
 
   worker:
     build:
       context: .
       dockerfile: Dockerfile
     container_name: billing-panel-worker
-    command: php artisan queue:work redis --sleep=3 --tries=3 --timeout=90 --backoff=60
+    # Stronger retry/backoff policy: 5 attempts, backoff 120s, longer timeout
+    command: php artisan queue:work redis --sleep=3 --tries=5 --timeout=120 --backoff=120 --memory=512
     environment:
       - APP_ENV=${APP_ENV:-production}
       - APP_DEBUG=${APP_DEBUG:-false}
       - DB_HOST=db
       - DB_DATABASE=${DB_DATABASE:-billing}
-      - DB_USERNAME=${DB_USERNAME:-root}
+      - DB_USERNAME=${DB_USERNAME:-billing}
       - DB_PASSWORD=${DB_PASSWORD:-secret}
       - REDIS_HOST=redis
       - REDIS_PORT=6379
     volumes:
-      - ./:/var/www
+      - ./:/var/www:delegated
     depends_on:
       redis:
         condition: service_healthy
@@ -117,12 +151,17 @@ services:
         condition: service_healthy
     networks:
       - appnet
-    restart: unless-stopped
+    restart: on-failure
     healthcheck:
       test: ["CMD-SHELL", "php -v >/dev/null 2>&1 || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3
+    deploy:
+      resources:
+        limits:
+          cpus: '0.25'
+          memory: 256M
 
   scheduler:
     build:

@@ -1,0 +1,45 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: password
+          MYSQL_DATABASE: billing
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd "mysqladmin ping -h localhost --silent"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: 8.2
+          extensions: mbstring, bcmath, intl, pdo_mysql
+      - name: Validate composer
+        run: composer validate --no-interaction || true
+      - name: Install composer deps
+        run: composer install --no-progress --no-interaction --prefer-dist
+      - name: Run PHP linter (Pint)
+        run: vendor/bin/pint --test
+      - name: Copy .env.testing
+        run: cp .env.example .env.testing || true
+      - name: Prepare database
+        run: |
+          php artisan key:generate --force
+          php artisan migrate --force
+      - name: Run tests
+        run: vendor/bin/phpunit --testdox -v || (php -v && php -r "echo 'phpunit failed'" && exit 1)

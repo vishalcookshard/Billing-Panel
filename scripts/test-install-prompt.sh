@@ -12,12 +12,12 @@ fi
 case "${ACTION}" in
   install|i)
     echo "[DRY-RUN] Action: install"
-    echo "[DRY-RUN] Would run (remote): curl -sSL https://raw.githubusercontent.com/isthisvishal/Billing-Panel/main/scripts/one-command-install.sh | sudo bash -s -- install"
+    echo "[DRY-RUN] Would run (remote): curl -fsSL -o one-command-install.sh https://raw.githubusercontent.com/isthisvishal/Billing-Panel/main/scripts/one-command-install.sh && curl -fsSL -o one-command-install.sh.sha256 https://raw.githubusercontent.com/isthisvishal/Billing-Panel/main/scripts/one-command-install.sh.sha256 && sha256sum --check one-command-install.sh.sha256 && sudo bash one-command-install.sh install"
     echo "[DRY-RUN] Would run (local): sudo bash scripts/one-command-install.sh install"
     ;;
   uninstall|u)
     echo "[DRY-RUN] Action: uninstall"
-    echo "[DRY-RUN] Would run (remote): curl -sSL https://raw.githubusercontent.com/isthisvishal/Billing-Panel/main/scripts/one-command-install.sh | sudo bash -s -- uninstall"
+    echo "[DRY-RUN] Would run (remote): curl -fsSL -o one-command-install.sh https://raw.githubusercontent.com/isthisvishal/Billing-Panel/main/scripts/one-command-install.sh && curl -fsSL -o one-command-install.sh.sha256 https://raw.githubusercontent.com/isthisvishal/Billing-Panel/main/scripts/one-command-install.sh.sha256 && sha256sum --check one-command-install.sh.sha256 && sudo bash one-command-install.sh uninstall"
     echo "[DRY-RUN] Would run (local): sudo bash scripts/one-command-install.sh uninstall"
     ;;
   exit|e)

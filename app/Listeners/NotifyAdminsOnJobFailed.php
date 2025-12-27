@@ -8,19 +8,34 @@ use Illuminate\Support\Facades\Log;
 use App\Notifications\AdminJobFailedNotification;
 use App\Models\User;
 
-class NotifyAdminsOnJobFailed implements ShouldQueue
+class NotifyAdminsOnJobFailed
 {
     public function handle(JobFailed $event)
     {
         try {
-            Log::warning('Job failed, notifying admins', ['connection' => $event->connectionName, 'job' => $event->job->getName()]);
+            // Detailed logging with exception information
+            $payload = [];
+            try {
+                $payload = $event->job->payload() ?? [];
+            } catch (\Throwable $e) {
+                // ignore payload extraction errors
+            }
 
+            Log::error('Job failed', [
+                'connection' => $event->connectionName,
+                'job' => method_exists($event->job, 'getName') ? $event->job->getName() : 'unknown',
+                'exception' => $event->exception->getMessage(),
+                'payload' => $payload,
+            ]);
+
+            // Notify admins immediately (synchronous) to avoid missing alerts when queue workers fail
             $admins = User::where('is_admin', true)->get();
             foreach ($admins as $admin) {
-                $admin->notify(new AdminJobFailedNotification($event));
+                // Use notifyNow to send synchronously
+                $admin->notifyNow(new AdminJobFailedNotification($event));
             }
         } catch (\Throwable $e) {
-            Log::error('Failed to notify admins about job failure: ' . $e->getMessage());
+            Log::critical('Failed to notify admins about job failure: ' . $e->getMessage(), ['original_exception' => $event->exception->getMessage() ?? null]);
         }
     }
 }
