@@ -40,6 +40,10 @@ class CheckoutController extends Controller
     {
         $request->validate([
             'billing_cycle' => 'required|in:monthly,yearly,lifetime',
+            'payment_method' => 'required|string|in:card,paypal,crypto',
+            'gateway' => 'required|string|exists:gateways,key',
+            'promo_code' => 'nullable|string|exists:promo_codes,code',
+            'amount' => 'required|numeric|min:0.01',
         ]);
 
         $user = auth()->user();

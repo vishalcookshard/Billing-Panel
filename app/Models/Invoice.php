@@ -7,6 +7,13 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Invoice extends Model
+    /**
+     * Get the order/service associated with this invoice
+     */
+    public function order()
+    {
+        return $this->belongsTo(Order::class, 'service_id');
+    }
 {
     use HasFactory;
     use SoftDeletes;

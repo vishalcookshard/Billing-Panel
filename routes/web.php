@@ -1,9 +1,4 @@
-use App\Http\Controllers\PasswordChangeController;
-// Password Change Routes
-Route::middleware('auth')->group(function () {
-    Route::get('/password/change', [PasswordChangeController::class, 'show'])->name('password.change');
-    Route::post('/password/change', [PasswordChangeController::class, 'update']);
-});
+
 <?php
 
 use Illuminate\Support\Facades\Route;

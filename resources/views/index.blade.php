@@ -26,7 +26,7 @@
                             @if($category->icon)
                                 {{-- Safe: icon_safe is sanitized by SafeHtml rule in ServiceCategory model --}}
                                 <div style="font-size: 3rem; margin-bottom: 15px;">
-                                    {!! $category->icon_safe !!}
+                                    {{ $category->icon_safe }}
                                 </div>
                             @else
                                 <i class="fas fa-cube" style="font-size: 3rem; color: var(--primary); margin-bottom: 15px;"></i>

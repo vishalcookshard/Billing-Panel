@@ -30,6 +30,11 @@ return new class extends Migration
                 $table->index('provisioned_at');
             });
         }
+        if (!isset($indexes['invoices_due_date_index'])) {
+            Schema::table('invoices', function (Blueprint $table) {
+                $table->index('due_date');
+            });
+        }
 
         // Add DB-level trigger to prevent modifying immutable fields after paid
         // This uses MySQL/MariaDB SIGNAL to throw an error when attempting forbidden changes
@@ -65,6 +70,7 @@ SQL
             $table->dropIndex(['status']);
             $table->dropIndex(['service_id']);
             $table->dropIndex(['provisioned_at']);
+            $table->dropIndex(['due_date']);
         });
 
         $driver = DB::getDriverName();

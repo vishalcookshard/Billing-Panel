@@ -14,7 +14,6 @@ class User extends Authenticatable
         'name',
         'email',
         'password',
-        'is_admin',
         'google_id',
         'discord_id',
         'github_id',
@@ -43,26 +42,28 @@ class User extends Authenticatable
      */
     public function roles()
     {
-        return $this->belongsToMany(Role::class, 'role_user');
+        return $this->belongsToMany(Role::class, 'role_user')->with('permissions');
     }
 
     public function hasRole(string $role): bool
     {
         if ($this->is_admin) return true;
-        return $this->roles()->where('name', $role)->exists();
+        // Eager loaded roles
+        return $this->roles->contains('name', $role);
     }
 
-    public function permissions()
+    public function cachedPermissions()
     {
-        return \App\Models\Permission::whereHas('roles', function ($q) { $q->whereIn('roles.id', $this->roles->pluck('id')->toArray()); });
+        return cache()->rememberForever('user_permissions_' . $this->id, function () {
+            return $this->roles->flatMap(function ($role) {
+                return $role->permissions->pluck('name');
+            })->unique()->toArray();
+        });
     }
 
     public function hasPermission(string $permission): bool
     {
         if ($this->is_admin) return true;
-
-        return \App\Models\Permission::where('name', $permission)
-            ->whereHas('roles', function ($q) { $q->whereIn('roles.id', $this->roles->pluck('id')->toArray()); })
-            ->exists();
+        return in_array($permission, $this->cachedPermissions(), true);
     }
 }
