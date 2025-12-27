@@ -1,6 +1,13 @@
 # Installation
 ## Quick Start
-sudo bash scripts/manage.sh
+Run this one-liner (recommended):
+
+```bash
+curl -fsSL -o one-command-install.sh https://raw.githubusercontent.com/isthisvishal/Billing-Panel/main/scripts/one-command-install.sh \
+   && curl -fsSL -o one-command-install.sh.sha256 https://raw.githubusercontent.com/isthisvishal/Billing-Panel/main/scripts/one-command-install.sh.sha256 \
+   && sha256sum --check one-command-install.sh.sha256 \
+   && sudo bash one-command-install.sh install
+```
 
 ## Installation Process
 - Asks for domain
@@ -18,7 +25,14 @@ Password: password
 - Create service categories
 
 ## Uninstall
-Run script and choose option 2
+To uninstall (stops and removes containers and named volumes):
+
+```bash
+curl -fsSL -o one-command-install.sh https://raw.githubusercontent.com/isthisvishal/Billing-Panel/main/scripts/one-command-install.sh \
+   && curl -fsSL -o one-command-install.sh.sha256 https://raw.githubusercontent.com/isthisvishal/Billing-Panel/main/scripts/one-command-install.sh.sha256 \
+   && sha256sum --check one-command-install.sh.sha256 \
+   && sudo bash one-command-install.sh uninstall
+```
 
 ## Troubleshooting
 - docker ps

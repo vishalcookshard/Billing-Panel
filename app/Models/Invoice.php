@@ -7,16 +7,8 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Invoice extends Model
-    /**
-     * Get the order/service associated with this invoice
-     */
-    public function order()
-    {
-        return $this->belongsTo(Order::class, 'service_id');
-    }
 {
-    use HasFactory;
-    use SoftDeletes;
+    use HasFactory, SoftDeletes;
 
     protected $fillable = [
         'user_id',
@@ -64,6 +56,11 @@ class Invoice extends Model
             self::STATUS_SUSPENDED,
             self::STATUS_TERMINATED,
         ];
+    }
+
+    public function order()
+    {
+        return $this->belongsTo(Order::class, 'service_id');
     }
 
     public function isPaid(): bool
@@ -138,6 +135,7 @@ class Invoice extends Model
                 throw new \RuntimeException("Invalid status transition from {$this->status} to {$value}");
             }
         }
+
 
         return parent::setAttribute($key, $value);
     }

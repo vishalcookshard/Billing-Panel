@@ -2,19 +2,18 @@
 
 
 
-FROM php:8.4-fpm-bullseye
+FROM php:8.2-fpm-bullseye AS base
 
-# Install system dependencies
+
+# Install system dependencies and PHP extensions
 RUN apt-get update && apt-get install -y --no-install-recommends \
     git unzip libicu-dev libzip-dev libpq-dev libonig-dev libpng-dev \
     libjpeg-dev libfreetype6-dev curl zip ca-certificates openssl \
     && rm -rf /var/lib/apt/lists/*
 
-# Install PHP extensions
 RUN docker-php-ext-configure gd --with-freetype --with-jpeg \
     && docker-php-ext-install pdo pdo_mysql intl zip mbstring opcache gd bcmath
 
-# Install redis extension
 RUN pecl install redis && docker-php-ext-enable redis
 
 # Install Composer
@@ -29,14 +28,17 @@ RUN groupadd -g ${APP_GID} ${APP_USER} || true \
 
 WORKDIR /var/www
 
-# Copy composer files and install dependencies
-COPY composer.json composer.lock* /var/www/
-RUN chown -R ${APP_USER}:${APP_USER} /var/www \
-  && export COMPOSER_ALLOW_SUPERUSER=1 \
-  && composer install --no-dev --prefer-dist --optimize-autoloader --no-interaction
+# --- Build stage ---
+FROM base AS build
+WORKDIR /var/www
+COPY composer.json composer.lock* ./
+RUN composer install --no-dev --prefer-dist --optimize-autoloader --no-interaction --no-scripts
 
-# Copy the rest of the application
-COPY --chown=${APP_USER}:${APP_USER} . /var/www
+# --- Production stage ---
+FROM base AS production
+WORKDIR /var/www
+COPY --from=build /var/www/vendor ./vendor
+COPY --chown=${APP_USER}:${APP_USER} . .
 
 # Ensure storage and cache directories exist and are writable
 RUN mkdir -p storage/framework/views storage/framework/cache storage/framework/sessions bootstrap/cache \

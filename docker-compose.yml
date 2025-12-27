@@ -17,7 +17,7 @@ services:
       - DB_PORT=3306
       - DB_DATABASE=billing
       - DB_USERNAME=billing
-      - DB_PASSWORD=secret
+      - DB_PASSWORD=ChangeThisToAStrongPassword1234
       - QUEUE_CONNECTION=redis
       - REDIS_HOST=redis
       - REDIS_PORT=6379
