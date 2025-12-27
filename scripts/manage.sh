@@ -1,294 +1,190 @@
 
+
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-# Global error trap for cleanup/rollback
-trap 'on_error ${LINENO} ${?}' ERR
-on_error() {
-  local rc=${2:-1}
-  log_error "Error at line ${1:-unknown}, code ${rc}. Initiating rollback."
-  rollback
-  exit ${rc}
-}
-
-# Timestamped logging
-log() { echo -e "[$(date +'%Y-%m-%d %H:%M:%S')] $*"; }
-log_error() { echo -e "\033[0;31m[$(date +'%Y-%m-%d %H:%M:%S')] ERROR: $*\033[0m" >&2; }
-
-# OS detection (Ubuntu/Debian only)
-if [ -f /etc/os-release ]; then
-  . /etc/os-release
-  case "${ID:-}" in
-    ubuntu|debian) : ;;
-    *) log_error "Unsupported OS: ${ID}. Supported: ubuntu, debian."; exit 2 ;;
-  esac
-else
-  log_error "Cannot detect OS. Aborting."; exit 2
-fi
-
-# Docker daemon health check
-if ! command -v docker >/dev/null 2>&1; then
-  log_error "Docker is required. Please install Docker."; exit 2
-fi
-if ! docker info >/dev/null 2>&1; then
-  log_error "Docker daemon is not running. Start Docker and retry."; exit 2
-fi
-
-# Billing-Panel Manager Script
-# Unified install, manage, and uninstall tool
-# Usage: bash manage.sh
-
-# ANSI Colors
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
-CYAN='\033[0;36m'
-NC='\033[0m'
-
-# Configuration
 INSTALL_DIR="/opt/Billing-Panel"
 REPO_URL="https://github.com/isthisvishal/Billing-Panel.git"
 REPO_BRANCH="main"
 
-# ============================================================================
-# UTILITY FUNCTIONS
-# ============================================================================
-
-
-# Error exit with logging
-error_exit() {
-  log_error "$1"
-  exit 1
+log() {
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*"
 }
 
-success() {
-  echo -e "${GREEN}✓ $1${NC}"
-}
-
-info() {
-  echo -e "${CYAN}ℹ $1${NC}"
-}
-
-section() {
-  echo ""
-  echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-  echo -e "${BLUE}  $1${NC}"
-  echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-  echo ""
-}
-
-confirm() {
-  local prompt="$1"
-  local response
-  read -p "$(echo -e "${YELLOW}⚠ $prompt (yes/no): ${NC}")" response </dev/tty
-  [[ "$response" == "yes" ]] && return 0 || return 1
-}
-
-
-# Strict FQDN validation
-validate_domain() {
-  local domain=$1
-  if [[ -z "$domain" ]]; then
-    error_exit "Domain cannot be empty."
-  fi
-  if [[ "$domain" == *"://"* ]]; then
-    error_exit "Invalid domain: '$domain'. Do not include http:// or https://."
-  fi
-  if ! [[ "$domain" =~ ^[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?)+$ ]]; then
-    error_exit "Invalid FQDN: '$domain'. Must be a valid domain (e.g., billing.example.com)"
-  fi
-  echo "$domain"
-}
-
-# ============================================================================
-# MENU
-# ============================================================================
-
-show_menu() {
-  clear
-  echo ""
-  echo -e "${CYAN}╔════════════════════════════════════════╗${NC}"
-  echo -e "${CYAN}║    Billing-Panel Manager${NC}"
-  echo -e "${CYAN}║    Production-Ready Billing System${NC}"
-  echo -e "${CYAN}╚════════════════════════════════════════╝${NC}"
-  echo ""
-  echo "What would you like to do?"
-
-  # Rollback logic for partial installs
-  rollback() {
-    log "[ROLLBACK] Cleaning up partial install..."
-    if docker compose ps -q | grep -q .; then
-      log "[ROLLBACK] Stopping and removing containers/volumes..."
-      docker compose down --volumes --remove-orphans || log_error "[ROLLBACK] Failed to fully remove compose stack"
+rollback() {
+    log "Rolling back installation..."
+    if [[ -d "$INSTALL_DIR" ]]; then
+        sudo rm -rf "$INSTALL_DIR"
+        log "Removed $INSTALL_DIR"
     fi
-    log "[ROLLBACK] Rollback complete. Manual cleanup may be required for DB or files."
-  }
-
-  # Modular uninstall function
-  uninstall_billing_panel() {
-    section "UNINSTALL BILLING-PANEL"
-    if ! confirm "Are you sure you want to uninstall and delete all containers/volumes? This cannot be undone."; then
-      log "Uninstall cancelled by user."; return
-    fi
-    log "Stopping and removing containers/volumes..."
-    docker compose down --volumes --remove-orphans
-    log "Uninstall complete."
-  }
-
-  # Modular verify function (checks health of containers and DB)
-  verify_billing_panel() {
-    section "VERIFY BILLING-PANEL HEALTH"
-    log "Checking Docker containers..."
-    docker compose ps
-    log "Checking app health endpoint..."
-    if curl -fsSL https://localhost/api/health | grep -q 'ok'; then
-      log "App health endpoint OK."
-    else
-      log_error "App health endpoint failed."
-    fi
-  }
-
-  # Main menu logic
-  main() {
-    show_menu
-    case "$choice" in
-      1) install_billing_panel ;;
-      2) uninstall_billing_panel ;;
-      3) log "Exiting."; exit 0 ;;
-      *) log_error "Invalid choice: $choice"; exit 1 ;;
-    esac
-  }
-
-  main
-  echo "  🔑 Password: password"
-  echo ""
-  echo "⚠️  IMPORTANT:"
-  echo "  1. Change the default password immediately"
-  echo "  2. Update admin email address"
-  echo "  3. Configure your domain DNS to point to this server"
-  echo "  4. Go to admin panel and create your service categories"
-  echo ""
 }
-
-# ============================================================================
-# INSTALL FUNCTION
-# ============================================================================
 
 install_billing_panel() {
-  section "BILLING-PANEL INSTALL"
-  info "Ensuring installation directory exists at $INSTALL_DIR"
-  if [[ ! -d "$INSTALL_DIR" ]]; then
-    info "Creating installation directory at $INSTALL_DIR"
-    mkdir -p "$INSTALL_DIR"
-    info "Cloning repository into $INSTALL_DIR"
-    git clone --branch "$REPO_BRANCH" "$REPO_URL" "$INSTALL_DIR"
-  fi
-  cd "$INSTALL_DIR"
+    while true; do
+        read -p "Enter your domain (e.g., billing.example.com): " FQDN </dev/tty
+        if [[ "$FQDN" =~ ^[a-zA-Z0-9.-]+$ ]] && [[ ! "$FQDN" =~ [[:space:]] ]] && [[ ! "$FQDN" =~ :// ]]; then
+            break
+        else
+            echo "Invalid domain. Please enter a valid domain (letters, numbers, dots, hyphens only)."
+        fi
+    done
 
-  # Required files checks
-  if [[ ! -f "docker-compose.yml" ]]; then
-    error_exit "docker-compose.yml is missing in $INSTALL_DIR. Aborting."
-  fi
-  if [[ ! -f ".env" ]]; then
-    error_exit ".env is missing in $INSTALL_DIR. Aborting."
-  fi
-  if [[ ! -f "Caddyfile" ]]; then
-    info "Caddyfile not found at $INSTALL_DIR/Caddyfile. Creating minimal Caddyfile."
-    cat > Caddyfile <<'EOF'
-:80
-root * /var/www/public
-php_fastcgi app:9000
-file_server
-EOF
-    success "Created minimal Caddyfile at $INSTALL_DIR/Caddyfile"
-  fi
+    echo "\nSummary:"
+    echo "Domain: $FQDN"
+    echo "Install dir: $INSTALL_DIR"
+    echo "Docker containers will be created."
+    read -p "Proceed with installation? (yes/no): " response </dev/tty
+    if [[ "$response" != "yes" ]]; then
+        return
+    fi
 
-  # Validate docker-compose config
-  info "Validating docker compose configuration..."
-  if ! docker compose config >/dev/null 2>&1; then
-    error_exit "docker compose config failed. Fix docker-compose.yml before proceeding."
-  fi
+    if [[ -d "$INSTALL_DIR" ]]; then
+        read -p "$INSTALL_DIR already exists. Remove and reinstall? (yes/no): " reinstall </dev/tty
+        if [[ "$reinstall" == "yes" ]]; then
+            sudo rm -rf "$INSTALL_DIR"
+        else
+            return
+        fi
+    fi
 
-  info "Bringing up docker compose stack..."
-  docker compose up -d --build
-  success "Billing-Panel services started."
+    sudo mkdir -p "$INSTALL_DIR"
+    cd "$INSTALL_DIR"
+
+    if ! command -v git >/dev/null 2>&1; then
+        echo "git is required. Please install git."
+        rollback
+        return
+    fi
+
+    if ! command -v docker >/dev/null 2>&1; then
+        echo "Docker is required. Please install Docker."
+        rollback
+        return
+    fi
+
+    if ! command -v docker compose >/dev/null 2>&1; then
+        echo "Docker Compose v2+ is required. Please install Docker Compose."
+        rollback
+        return
+    fi
+
+    log "Cloning repository..."
+    if ! git clone --branch "$REPO_BRANCH" "$REPO_URL" .; then
+        echo "Failed to clone repository."
+        rollback
+        return
+    fi
+
+    if [[ ! -f .env ]]; then
+        cp .env.example .env
+    fi
+    sed -i "s|^APP_URL=.*|APP_URL=https://$FQDN|" .env
+
+    log "Validating docker compose config..."
+    if ! sudo docker compose config; then
+        echo "docker compose config failed."
+        rollback
+        return
+    fi
+
+    log "Starting containers..."
+    if ! sudo docker compose up -d --build; then
+        echo "docker compose up failed."
+        rollback
+        return
+    fi
+
+    log "Waiting for app container health (max 120s)..."
+    for i in {1..24}; do
+        health=$(sudo docker inspect --format='{{.State.Health.Status}}' $(sudo docker compose ps -q app) 2>/dev/null || echo "unknown")
+        if [[ "$health" == "healthy" ]]; then
+            break
+        fi
+        sleep 5
+    done
+    if [[ "$health" != "healthy" ]]; then
+        echo "App container did not become healthy."
+        rollback
+        return
+    fi
+
+    log "Running migrations..."
+    if ! sudo docker compose exec -T app php artisan migrate --force; then
+        echo "Migration failed."
+        rollback
+        return
+    fi
+
+    log "Seeding database..."
+    if ! sudo docker compose exec -T app php artisan db:seed --force; then
+        echo "Seeding failed."
+        rollback
+        return
+    fi
+
+    echo "\nInstallation complete!"
+    echo "URL: https://$FQDN"
+    echo "Default credentials:"
+    echo "  Email: admin@example.com"
+    echo "  Password: password"
+    echo "\nSECURITY WARNING:"
+    echo "- Change the admin password immediately."
+    echo "- Update the admin email."
+    echo "- Configure DNS for $FQDN."
+    echo "- Create service categories."
+    read -p "Press Enter to return to menu..." </dev/tty
 }
-
-# ============================================================================
-# UNINSTALL FUNCTION
-# ============================================================================
 
 uninstall_billing_panel() {
-  section "BILLING-PANEL UNINSTALL"
-  
-  # Check if installed
-  if [[ ! -d "$INSTALL_DIR" ]]; then
-    error_exit "Billing-Panel not found at $INSTALL_DIR"
-  fi
-  
-  success "Found installation at $INSTALL_DIR"
-  
-  # Final confirmation
-  echo ""
-  if ! confirm "Permanently delete Billing-Panel and all data?"; then
-    error_exit "Uninstall cancelled"
-  fi
-  
-  if ! confirm "This action CANNOT be undone. Delete everything?"; then
-    error_exit "Uninstall cancelled"
-  fi
-  
-  section "REMOVING APPLICATION"
-  
-  info "Stopping Docker containers..."
-  cd "$INSTALL_DIR"
-  docker compose down > /dev/null 2>&1 || true
-  success "Containers stopped"
-  
-  info "Removing Docker volumes..."
-  docker volume rm billing-panel-db_data 2>/dev/null || true
-  docker volume rm billing-panel-caddy_data 2>/dev/null || true
-  docker volume rm billing-panel-caddy_config 2>/dev/null || true
-  success "Volumes removed"
-  
-  info "Deleting installation directory..."
-  rm -rf "$INSTALL_DIR"
-  success "Installation removed"
-  
-  section "UNINSTALL COMPLETE"
-  echo ""
-  echo -e "${GREEN}✓ Billing-Panel has been completely removed${NC}"
-  echo ""
+    if [[ ! -d "$INSTALL_DIR" ]]; then
+        echo "$INSTALL_DIR not found. Nothing to uninstall."
+        read -p "Press Enter to return to menu..." </dev/tty
+        return
+    fi
+    echo "WARNING: This will permanently delete all Billing-Panel data, containers, and volumes!"
+    read -p "Are you sure? (yes/no): " response </dev/tty
+    if [[ "$response" != "yes" ]]; then
+        return
+    fi
+    read -p "Type yes again to confirm: " response </dev/tty
+    if [[ "$response" != "yes" ]]; then
+        return
+    fi
+    cd "$INSTALL_DIR"
+    sudo docker compose down --volumes --remove-orphans || true
+    for v in billing-panel-db_data billing-panel-caddy_data billing-panel-caddy_config; do
+        sudo docker volume rm -f "$v" 2>/dev/null || true
+    done
+    cd /
+    sudo rm -rf "$INSTALL_DIR"
+    echo "Uninstall complete."
+    read -p "Press Enter to return to menu..." </dev/tty
 }
 
-# ============================================================================
-# MAIN
-# ============================================================================
+show_menu() {
+    clear
+    echo "╔════════════════════════════════════════╗"
+    echo "║ Billing-Panel Manager                  ║"
+    echo "║ Production-Ready Billing System        ║"
+    echo "╚════════════════════════════════════════╝"
+    echo "1) Install Billing-Panel"
+    echo "2) Uninstall Billing-Panel"
+    echo "3) Exit"
+}
 
 main() {
-  while true; do
-    show_menu
-    
-    case "$choice" in
-      1)
-        install_billing_panel
-        read -p "Press Enter to return to menu..." </dev/tty
-        ;;
-      2)
-        uninstall_billing_panel
-        read -p "Press Enter to return to menu..." </dev/tty
-        ;;
-      3)
-        echo ""
-        echo -e "${CYAN}Goodbye!${NC}"
-        exit 0
-        ;;
-      *)
-        error_exit "Invalid choice"
-        ;;
-    esac
-  done
+    trap 'echo; echo "Aborted."; exit 130' INT
+    trap 'echo; echo "An error occurred. Exiting."; exit 1' ERR
+    while true; do
+        show_menu
+        read -p "Enter your choice [1-3]: " choice </dev/tty
+        case "$choice" in
+            1) install_billing_panel ;;
+            2) uninstall_billing_panel ;;
+            3) exit 0 ;;
+            *) echo "Invalid choice. Please try again."; sleep 1 ;;
+        esac
+    done
 }
 
 main "$@"

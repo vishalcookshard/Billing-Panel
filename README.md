@@ -1,3 +1,36 @@
+# Installation
+## Quick Start
+sudo bash scripts/manage.sh
+
+## Installation Process
+- Asks for domain
+- Sets up Docker
+- Runs migrations and seeds
+
+## Default Credentials
+Email: admin@example.com
+Password: password
+
+## Important After Installation
+- Change admin password
+- Update admin email
+- Configure DNS
+- Create service categories
+
+## Uninstall
+Run script and choose option 2
+
+## Troubleshooting
+- docker ps
+- docker compose logs -f
+- docker compose exec app php artisan migrate --force
+
+## System Requirements
+- Ubuntu 20.04+ / Debian 10+
+- Docker 20.10+
+- Docker Compose 2+
+- 2GB RAM
+- 2GB disk
 # Billing-Panel
 
 A modern, production-ready billing and hosting management system built with Laravel. Perfect for hosting providers, SaaS companies, and digital service businesses.
