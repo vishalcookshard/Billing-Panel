@@ -9,9 +9,12 @@ return new class extends Migration
 {
     public function up(): void
     {
-        // Only add indexes if they do not exist
-        $sm = Schema::getConnection()->getDoctrineSchemaManager();
-        $indexes = $sm->listTableIndexes('invoices');
+        $connection = Schema::getConnection();
+        $sm = $connection->getDoctrineSchemaManager();
+        $indexes = [];
+        foreach ($sm->listTableIndexes('invoices') as $idx) {
+            $indexes[$idx->getName()] = true;
+        }
         if (!isset($indexes['invoices_status_index'])) {
             Schema::table('invoices', function (Blueprint $table) {
                 $table->index('status');
