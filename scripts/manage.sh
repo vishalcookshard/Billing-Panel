@@ -47,7 +47,7 @@ CYAN='\033[0;36m'
 NC='\033[0m'
 
 # Configuration
-INSTALL_DIR="/opt/billing-panel"
+INSTALL_DIR="/opt/Billing-Panel"
 REPO_URL="https://github.com/isthisvishal/Billing-Panel.git"
 REPO_BRANCH="main"
 
@@ -169,6 +169,50 @@ show_menu() {
   echo "  3. Configure your domain DNS to point to this server"
   echo "  4. Go to admin panel and create your service categories"
   echo ""
+}
+
+# ============================================================================
+# INSTALL FUNCTION
+# ============================================================================
+
+install_billing_panel() {
+  section "BILLING-PANEL INSTALL"
+  info "Ensuring installation directory exists at $INSTALL_DIR"
+  if [[ ! -d "$INSTALL_DIR" ]]; then
+    info "Creating installation directory at $INSTALL_DIR"
+    mkdir -p "$INSTALL_DIR"
+    info "Cloning repository into $INSTALL_DIR"
+    git clone --branch "$REPO_BRANCH" "$REPO_URL" "$INSTALL_DIR"
+  fi
+  cd "$INSTALL_DIR"
+
+  # Required files checks
+  if [[ ! -f "docker-compose.yml" ]]; then
+    error_exit "docker-compose.yml is missing in $INSTALL_DIR. Aborting."
+  fi
+  if [[ ! -f ".env" ]]; then
+    error_exit ".env is missing in $INSTALL_DIR. Aborting."
+  fi
+  if [[ ! -f "Caddyfile" ]]; then
+    info "Caddyfile not found at $INSTALL_DIR/Caddyfile. Creating minimal Caddyfile."
+    cat > Caddyfile <<'EOF'
+:80
+root * /var/www/public
+php_fastcgi app:9000
+file_server
+EOF
+    success "Created minimal Caddyfile at $INSTALL_DIR/Caddyfile"
+  fi
+
+  # Validate docker-compose config
+  info "Validating docker compose configuration..."
+  if ! docker compose config >/dev/null 2>&1; then
+    error_exit "docker compose config failed. Fix docker-compose.yml before proceeding."
+  fi
+
+  info "Bringing up docker compose stack..."
+  docker compose up -d --build
+  success "Billing-Panel services started."
 }
 
 # ============================================================================

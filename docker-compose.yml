@@ -23,9 +23,9 @@ services:
       - REDIS_HOST=redis
       - REDIS_PORT=6379
     volumes:
-      - ./:/var/www:delegated
-      - /var/www/node_modules
-      - /var/www/vendor
+      - /opt/Billing-Panel:/var/www:delegated
+      - node_modules:/var/www/node_modules
+      - vendor:/var/www/vendor
     depends_on:
       db:
         condition: service_healthy
@@ -56,8 +56,8 @@ services:
       - APP_HOST=${APP_HOST:-localhost}
       - ACME_EMAIL=${ACME_EMAIL:-}
     volumes:
-      - ./Caddyfile:/etc/caddy/Caddyfile:ro
-      - ./public:/var/www/public:ro
+      - /opt/Billing-Panel/Caddyfile:/etc/caddy/Caddyfile:ro
+      - /opt/Billing-Panel/public:/var/www/public:ro
       - caddy_data:/data
       - caddy_config:/config
     depends_on:
@@ -141,7 +141,7 @@ services:
       - REDIS_HOST=redis
       - REDIS_PORT=6379
     volumes:
-      - ./:/var/www:delegated
+      - /opt/Billing-Panel:/var/www:delegated
     depends_on:
       redis:
         condition: service_healthy
@@ -179,7 +179,7 @@ services:
       - REDIS_HOST=redis
       - REDIS_PORT=6379
     volumes:
-      - ./:/var/www
+      - /opt/Billing-Panel:/var/www
     depends_on:
       db:
         condition: service_healthy
@@ -194,35 +194,15 @@ services:
       timeout: 10s
       retries: 3
 
-  scheduler:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    container_name: billing-panel-scheduler
-    command: php artisan schedule:work --verbose --no-interaction
-    environment:
-      - APP_ENV=${APP_ENV:-production}
-      - APP_DEBUG=${APP_DEBUG:-false}
-      - DB_HOST=db
-      - DB_DATABASE=${DB_DATABASE:-billing}
-      - DB_USERNAME=${DB_USERNAME:-root}
-      - DB_PASSWORD=${DB_PASSWORD:-secret}
-      - REDIS_HOST=redis
-      - REDIS_PORT=6379
-    volumes:
-      - ./:/var/www
-    depends_on:
-      - db
-      - app
-    networks:
-      - appnet
-    restart: unless-stopped
+
 
 volumes:
   db_data:
   caddy_data:
   caddy_config:
   redis_data:
+  node_modules:
+  vendor:
 
 networks:
   appnet:
