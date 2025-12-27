@@ -1,6 +1,21 @@
-# Installation
-## Quick Start
-Run this one-liner (recommended):
+
+# Billing-Panel
+
+A modern, production-ready billing and hosting management system built with Laravel. Perfect for hosting providers, SaaS companies, and digital service businesses.
+
+---
+
+## 🚀 One-Line Install (Recommended)
+
+**Requirements:**
+- Ubuntu 20.04+ or Debian 11+ (Ubuntu 22.04 recommended)
+- Docker Engine 20.10+ and Docker Compose v2+
+- 2GB+ RAM (4GB+ recommended)
+- 5GB+ free disk space
+- Root access (sudo)
+- A domain name (e.g., billing.example.com) pointed to your server's IP
+
+**Install in one command:**
 
 ```bash
 curl -fsSL -o one-command-install.sh https://raw.githubusercontent.com/isthisvishal/Billing-Panel/main/scripts/one-command-install.sh \
@@ -9,23 +24,26 @@ curl -fsSL -o one-command-install.sh https://raw.githubusercontent.com/isthisvis
    && sudo bash one-command-install.sh install
 ```
 
-## Installation Process
-- Asks for domain
-- Sets up Docker
-- Runs migrations and seeds
+The script will prompt for your domain (FQDN) and confirm before any destructive actions. For non-interactive install:
 
-## Default Credentials
-Email: admin@example.com
-Password: password
+```bash
+FQDN=billing.example.com YES=1 sudo bash one-command-install.sh install
+```
 
-## Important After Installation
-- Change admin password
-- Update admin email
-- Configure DNS
-- Create service categories
+---
+
+## Default Admin Credentials
+
+- Email: admin@example.com
+- Password: password
+
+**Change these immediately after first login!**
+
+---
 
 ## Uninstall
-To uninstall (stops and removes containers and named volumes):
+
+To uninstall (removes containers and volumes):
 
 ```bash
 curl -fsSL -o one-command-install.sh https://raw.githubusercontent.com/isthisvishal/Billing-Panel/main/scripts/one-command-install.sh \
@@ -34,18 +52,24 @@ curl -fsSL -o one-command-install.sh https://raw.githubusercontent.com/isthisvis
    && sudo bash one-command-install.sh uninstall
 ```
 
-## Troubleshooting
-- docker ps
-- docker compose logs -f
-- docker compose exec app php artisan migrate --force
+---
 
-## System Requirements
-- Ubuntu 20.04+ / Debian 10+
-- Docker 20.10+
-- Docker Compose 2+
-- 2GB RAM
-- 2GB disk
-# Billing-Panel
+## After Installation
+
+1. Access your panel: `https://your-domain.com`
+2. Login with default admin credentials
+3. Change admin password and email
+4. Configure DNS and create service categories
+
+---
+
+## Troubleshooting
+
+- `docker ps` — Check running containers
+- `docker compose logs -f` — View logs
+- `docker compose exec app php artisan migrate --force` — Run migrations manually
+
+---
 
 A modern, production-ready billing and hosting management system built with Laravel. Perfect for hosting providers, SaaS companies, and digital service businesses.
 
