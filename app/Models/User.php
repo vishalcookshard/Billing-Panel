@@ -19,6 +19,7 @@ class User extends Authenticatable
         'discord_id',
         'github_id',
         'avatar_url',
+        'password_change_required',
     ];
 
     protected $hidden = ['password'];
@@ -26,6 +27,7 @@ class User extends Authenticatable
     protected $casts = [
         'is_admin' => 'boolean',
         'email_verified_at' => 'datetime',
+        'password_change_required' => 'boolean',
     ];
 
     /**

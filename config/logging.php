@@ -21,6 +21,19 @@ return [
     |--------------------------------------------------------------------------
     */
     'channels' => [
+                'security' => [
+                    'driver' => 'daily',
+                    'path' => storage_path('logs/security.log'),
+                    'level' => 'info',
+                    'days' => 30,
+                ],
+
+                'api' => [
+                    'driver' => 'daily',
+                    'path' => storage_path('logs/api.log'),
+                    'level' => 'info',
+                    'days' => 7,
+                ],
         'stack' => [
             'driver' => 'stack',
             'channels' => ['single'],
