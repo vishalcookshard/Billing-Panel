@@ -9,11 +9,24 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::table('invoices', function (Blueprint $table) {
-            $table->index('status');
-            $table->index('service_id');
-            $table->index('provisioned_at');
-        });
+        // Only add indexes if they do not exist
+        $sm = Schema::getConnection()->getDoctrineSchemaManager();
+        $indexes = $sm->listTableIndexes('invoices');
+        if (!isset($indexes['invoices_status_index'])) {
+            Schema::table('invoices', function (Blueprint $table) {
+                $table->index('status');
+            });
+        }
+        if (!isset($indexes['invoices_service_id_index'])) {
+            Schema::table('invoices', function (Blueprint $table) {
+                $table->index('service_id');
+            });
+        }
+        if (!isset($indexes['invoices_provisioned_at_index'])) {
+            Schema::table('invoices', function (Blueprint $table) {
+                $table->index('provisioned_at');
+            });
+        }
 
         // Add DB-level trigger to prevent modifying immutable fields after paid
         // This uses MySQL/MariaDB SIGNAL to throw an error when attempting forbidden changes
