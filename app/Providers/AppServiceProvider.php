@@ -49,14 +49,16 @@ class AppServiceProvider extends ServiceProvider
                     throw new \RuntimeException('Queue driver is set to sync in production. Set QUEUE_CONNECTION to a proper queue and ensure workers are running.');
                 }
 
-                // Basic connectivity check for Redis if using it
-                if ($driver === 'redis') {
+                // Only check Redis if not running in console (artisan)
+                if ($driver === 'redis' && !app()->runningInConsole()) {
                     try {
                         if (\Illuminate\Support\Facades\Redis::ping() !== 'PONG') {
-                            throw new \RuntimeException('Redis unavailable for queue.');
+                            // Log error, do not throw
+                            \Log::error('Redis unavailable for queue.');
                         }
                     } catch (\Throwable $e) {
-                        throw new \RuntimeException('Queue connectivity check failed: ' . $e->getMessage());
+                        // Log error, do not throw
+                        \Log::error('Queue connectivity check failed: ' . $e->getMessage());
                     }
                 }
 

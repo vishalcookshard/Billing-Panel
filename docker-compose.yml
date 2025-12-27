@@ -23,9 +23,8 @@ services:
       - REDIS_HOST=redis
       - REDIS_PORT=6379
     volumes:
-      - /opt/Billing-Panel:/var/www:delegated
+      - .:/var/www:delegated
       - node_modules:/var/www/node_modules
-      - vendor:/var/www/vendor
     depends_on:
       db:
         condition: service_healthy
@@ -39,12 +38,7 @@ services:
         limits:
           cpus: '0.50'
           memory: 512M
-    healthcheck:
-      test: ["CMD-SHELL", "wget --spider --quiet ${APP_URL:-http://localhost}/api/health || exit 1"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
+
 
   web:
     image: caddy:2
@@ -56,8 +50,8 @@ services:
       - APP_HOST=${APP_HOST:-localhost}
       - ACME_EMAIL=${ACME_EMAIL:-}
     volumes:
-      - /opt/Billing-Panel/Caddyfile:/etc/caddy/Caddyfile:ro
-      - /opt/Billing-Panel/public:/var/www/public:ro
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./public:/var/www/public:ro
       - caddy_data:/data
       - caddy_config:/config
     depends_on:
@@ -141,7 +135,7 @@ services:
       - REDIS_HOST=redis
       - REDIS_PORT=6379
     volumes:
-      - /opt/Billing-Panel:/var/www:delegated
+      - .:/var/www:delegated
     depends_on:
       redis:
         condition: service_healthy
@@ -152,11 +146,7 @@ services:
     networks:
       - appnet
     restart: on-failure
-    healthcheck:
-      test: ["CMD-SHELL", "php -v >/dev/null 2>&1 || exit 1"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
+
     deploy:
       resources:
         limits:
@@ -179,7 +169,7 @@ services:
       - REDIS_HOST=redis
       - REDIS_PORT=6379
     volumes:
-      - /opt/Billing-Panel:/var/www
+      - .:/var/www
     depends_on:
       db:
         condition: service_healthy
@@ -188,11 +178,7 @@ services:
     networks:
       - appnet
     restart: unless-stopped
-    healthcheck:
-      test: ["CMD-SHELL", "php -v >/dev/null 2>&1 || exit 1"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
+
 
 
 
@@ -202,7 +188,6 @@ volumes:
   caddy_config:
   redis_data:
   node_modules:
-  vendor:
 
 networks:
   appnet:

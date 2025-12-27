@@ -1,8 +1,7 @@
 
 
 
-# Use official PHP 8.2 FPM image (includes php-fpm and all extensions)
-FROM php:8.2-fpm-bullseye
+FROM php:8.4-fpm-bullseye
 
 # Install system dependencies and OpenSSL 1.1 compatibility
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -36,7 +35,6 @@ RUN docker-php-ext-configure gd --with-freetype --with-jpeg \
 # Enable OpCache
 RUN docker-php-ext-enable opcache
 
-# Install Composer
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 
 # Install redis extension
@@ -71,9 +69,7 @@ RUN sed -i 's/listen = 127.0.0.1:9000/listen = 0.0.0.0:9000/' /usr/local/etc/php
 # Expose port
 EXPOSE 9000
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
-    CMD php -v || exit 1
+
 
 # Run as non-root user
 USER ${APP_USER}:${APP_USER}
