@@ -40,7 +40,7 @@ WORKDIR /var/www
 COPY --from=build /var/www/vendor ./vendor
 COPY --chown=${APP_USER}:${APP_USER} . .
 
-# Ensure storage and cache directories exist and are writable
+# Ensure storage and cache directories exist and are writable for first-time deploys
 RUN mkdir -p storage/framework/views storage/framework/cache storage/framework/sessions bootstrap/cache \
     && chown -R ${APP_USER}:${APP_USER} storage bootstrap/cache \
     && chmod -R 775 storage bootstrap/cache

@@ -51,10 +51,25 @@ fi
 log "Validating environment..."
 php artisan env:validate || fatal "Environment validation failed."
 
-# Run artisan commands (package:discover removed from composer scripts to avoid binding errors)
+
+# Wait for DB to be ready before running migrations
 if [ "${APP_ENV:-}" != "testing" ]; then
-  log "Running migrations..."
-  php artisan migrate --force || log "Migrations failed, continuing startup."
+  log "Checking database connectivity before migrations..."
+  for i in {1..30}; do
+    if php artisan migrate:status > /dev/null 2>&1; then
+      log "Database is ready. Running migrations..."
+      if ! php artisan migrate --force; then
+        fatal "Migrations failed. See logs for details. Startup aborted."
+      fi
+      break
+    else
+      log "Waiting for database... ($i/30)"
+      sleep 2
+    fi
+    if [ "$i" -eq 30 ]; then
+      fatal "Database not ready after 60 seconds. Startup aborted."
+    fi
+  done
 fi
 
 log "Startup complete, launching php-fpm in foreground"

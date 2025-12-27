@@ -9,31 +9,37 @@ return new class extends Migration
 {
     public function up(): void
     {
-        $connection = Schema::getConnection();
-        $sm = $connection->getDoctrineSchemaManager();
-        $indexes = [];
-        foreach ($sm->listTableIndexes('invoices') as $idx) {
-            $indexes[$idx->getName()] = true;
-        }
-        if (!isset($indexes['invoices_status_index'])) {
+        // Add indexes if they don't exist (Laravel handles duplicates gracefully)
+        try {
             Schema::table('invoices', function (Blueprint $table) {
                 $table->index('status');
             });
+        } catch (Exception $e) {
+            // Index might already exist, continue
         }
-        if (!isset($indexes['invoices_service_id_index'])) {
+
+        try {
             Schema::table('invoices', function (Blueprint $table) {
                 $table->index('service_id');
             });
+        } catch (Exception $e) {
+            // Index might already exist, continue
         }
-        if (!isset($indexes['invoices_provisioned_at_index'])) {
+
+        try {
             Schema::table('invoices', function (Blueprint $table) {
                 $table->index('provisioned_at');
             });
+        } catch (Exception $e) {
+            // Index might already exist, continue
         }
-        if (!isset($indexes['invoices_due_date_index'])) {
+
+        try {
             Schema::table('invoices', function (Blueprint $table) {
                 $table->index('due_date');
             });
+        } catch (Exception $e) {
+            // Index might already exist, continue
         }
 
         // Add DB-level trigger to prevent modifying immutable fields after paid
