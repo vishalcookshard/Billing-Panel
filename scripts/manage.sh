@@ -1,5 +1,38 @@
+
 #!/usr/bin/env bash
-set -euo pipefail
+set -Eeuo pipefail
+
+# Global error trap for cleanup/rollback
+trap 'on_error ${LINENO} ${?}' ERR
+on_error() {
+  local rc=${2:-1}
+  log_error "Error at line ${1:-unknown}, code ${rc}. Initiating rollback."
+  rollback
+  exit ${rc}
+}
+
+# Timestamped logging
+log() { echo -e "[$(date +'%Y-%m-%d %H:%M:%S')] $*"; }
+log_error() { echo -e "\033[0;31m[$(date +'%Y-%m-%d %H:%M:%S')] ERROR: $*\033[0m" >&2; }
+
+# OS detection (Ubuntu/Debian only)
+if [ -f /etc/os-release ]; then
+  . /etc/os-release
+  case "${ID:-}" in
+    ubuntu|debian) : ;;
+    *) log_error "Unsupported OS: ${ID}. Supported: ubuntu, debian."; exit 2 ;;
+  esac
+else
+  log_error "Cannot detect OS. Aborting."; exit 2
+fi
+
+# Docker daemon health check
+if ! command -v docker >/dev/null 2>&1; then
+  log_error "Docker is required. Please install Docker."; exit 2
+fi
+if ! docker info >/dev/null 2>&1; then
+  log_error "Docker daemon is not running. Start Docker and retry."; exit 2
+fi
 
 # Billing-Panel Manager Script
 # Unified install, manage, and uninstall tool
@@ -22,8 +55,10 @@ REPO_BRANCH="main"
 # UTILITY FUNCTIONS
 # ============================================================================
 
+
+# Error exit with logging
 error_exit() {
-  echo -e "${RED}✗ ERROR: $1${NC}" >&2
+  log_error "$1"
   exit 1
 }
 
@@ -50,21 +85,19 @@ confirm() {
   [[ "$response" == "yes" ]] && return 0 || return 1
 }
 
+
+# Strict FQDN validation
 validate_domain() {
   local domain=$1
-  
-  if [[ ! "$domain" =~ \. ]]; then
-    error_exit "Invalid domain: '$domain'\nMust be valid FQDN (e.g., billing.example.com)"
+  if [[ -z "$domain" ]]; then
+    error_exit "Domain cannot be empty."
   fi
-  
   if [[ "$domain" == *"://"* ]]; then
-    error_exit "Invalid domain: '$domain'\nDon't include http:// or https://"
+    error_exit "Invalid domain: '$domain'. Do not include http:// or https://."
   fi
-  
-  if [[ ! "$domain" =~ ^[a-zA-Z0-9.-]+$ ]]; then
-    error_exit "Invalid domain: '$domain'\nOnly alphanumeric characters, dots, and hyphens allowed"
+  if ! [[ "$domain" =~ ^[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?)+$ ]]; then
+    error_exit "Invalid FQDN: '$domain'. Must be a valid domain (e.g., billing.example.com)"
   fi
-  
   echo "$domain"
 }
 
@@ -81,315 +114,53 @@ show_menu() {
   echo -e "${CYAN}╚════════════════════════════════════════╝${NC}"
   echo ""
   echo "What would you like to do?"
-  echo ""
-  echo "  1) Install Billing-Panel"
-  echo "  2) Uninstall Billing-Panel"
-  echo "  3) Exit"
-  echo ""
-  read -p "Enter your choice (1-3): " choice </dev/tty
-}
 
-# ============================================================================
-# INSTALL FUNCTION
-# ============================================================================
-
-install_billing_panel() {
-  trap 'error_exit "Installation failed at line $LINENO"' ERR
-  
-  section "BILLING-PANEL INSTALLATION"
-  
-  # Root check
-  [[ $EUID -ne 0 ]] && error_exit "Must run as root (use: sudo bash manage.sh)"
-  success "Running as root"
-  
-  # Disk space check
-  local available_space=$(df / | awk 'NR==2 {print $4}')
-  [[ "$available_space" -lt 5242880 ]] && error_exit "Need 5GB+ disk space (have: $((available_space / 1048576))GB)"
-  success "Disk space: $((available_space / 1048576))GB available"
-  
-  # Get domain
-  section "CONFIGURATION"
-  local domain
-  read -p "Enter your domain (e.g., billing.example.com): " domain </dev/tty
-  domain=$(validate_domain "$domain")
-  domain="${domain#https://}"
-  domain="${domain#http://}"
-  domain="${domain%/}"
-  success "Domain: $domain"
-  
-  # Confirm installation
-  echo ""
-  if ! confirm "Install Billing-Panel on $domain?"; then
-    error_exit "Installation cancelled"
-  fi
-  
-  section "INSTALLING DEPENDENCIES"
-  
-  # Remove conflicting services
-  info "Removing conflicting services..."
-  systemctl disable nginx 2>/dev/null || true
-  apt purge -y nginx nginx-common 2>/dev/null || true
-  success "Cleaned old services"
-  
-  # Update system
-  info "Updating system packages..."
-  apt-get update > /dev/null 2>&1
-  apt-get install -y --no-install-recommends \
-    ca-certificates curl gnupg lsb-release git > /dev/null 2>&1
-  success "System packages updated"
-  
-  # Install Docker
-  if ! command -v docker >/dev/null 2>&1; then
-    info "Installing Docker..."
-    mkdir -p /etc/apt/keyrings
-    curl -fsSL https://download.docker.com/linux/ubuntu/gpg 2>/dev/null | \
-      gpg --dearmor -o /etc/apt/keyrings/docker.gpg 2>/dev/null
-    echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | \
-      tee /etc/apt/sources.list.d/docker.list > /dev/null 2>&1
-    apt-get update > /dev/null 2>&1
-    apt-get install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin > /dev/null 2>&1
-    success "Docker installed"
-  else
-    success "Docker already installed"
-  fi
-  
-  systemctl enable docker > /dev/null 2>&1
-  systemctl start docker > /dev/null 2>&1
-  success "Docker service running"
-  
-  section "SETTING UP APPLICATION"
-  
-  # Clone repo with retries
-  info "Cloning repository..."
-  
-  # Ensure parent directory exists
-  local parent_dir=$(dirname "$INSTALL_DIR")
-  if [[ ! -d "$parent_dir" ]]; then
-    info "Creating directory $parent_dir..."
-    mkdir -p "$parent_dir" || error_exit "Failed to create $parent_dir. Check permissions."
-  fi
-  
-  # Remove existing installation if present
-  # If the current working directory is inside the install dir, move out
-  if [[ -d "$INSTALL_DIR" ]]; then
-    local cwd
-    cwd=$(pwd -P || true)
-    if [[ -n "$cwd" && ("$cwd" == "$INSTALL_DIR" || "$cwd" == "$INSTALL_DIR"/*) ]]; then
-      info "Current working directory is inside $INSTALL_DIR; switching to /tmp before removal..."
-      cd /tmp || error_exit "Failed to change directory to /tmp"
+  # Rollback logic for partial installs
+  rollback() {
+    log "[ROLLBACK] Cleaning up partial install..."
+    if docker compose ps -q | grep -q .; then
+      log "[ROLLBACK] Stopping and removing containers/volumes..."
+      docker compose down --volumes --remove-orphans || log_error "[ROLLBACK] Failed to fully remove compose stack"
     fi
-    rm -rf "$INSTALL_DIR"
-  fi
+    log "[ROLLBACK] Rollback complete. Manual cleanup may be required for DB or files."
+  }
 
-  # Ensure we're not in a removed/non-existent working directory before cloning
-  # (protects against "fatal: Unable to read current working directory: No such file or directory")
-  cd /tmp || true
-  
-  local clone_success=0
-  local max_retries=3
-  local retry=0
-  
-  while [ $retry -lt $max_retries ]; do
-    local git_output
-    if git_output=$(git clone -b "$REPO_BRANCH" "$REPO_URL" "$INSTALL_DIR" 2>&1); then
-      clone_success=1
-      break
+  # Modular uninstall function
+  uninstall_billing_panel() {
+    section "UNINSTALL BILLING-PANEL"
+    if ! confirm "Are you sure you want to uninstall and delete all containers/volumes? This cannot be undone."; then
+      log "Uninstall cancelled by user."; return
+    fi
+    log "Stopping and removing containers/volumes..."
+    docker compose down --volumes --remove-orphans
+    log "Uninstall complete."
+  }
+
+  # Modular verify function (checks health of containers and DB)
+  verify_billing_panel() {
+    section "VERIFY BILLING-PANEL HEALTH"
+    log "Checking Docker containers..."
+    docker compose ps
+    log "Checking app health endpoint..."
+    if curl -fsSL https://localhost/api/health | grep -q 'ok'; then
+      log "App health endpoint OK."
     else
-      retry=$((retry + 1))
-      if [ $retry -lt $max_retries ]; then
-        info "Clone attempt $retry failed, retrying in 5 seconds..."
-        sleep 5
-      fi
+      log_error "App health endpoint failed."
     fi
-  done
-  
-  if [ $clone_success -eq 0 ]; then
-    error_exit "Failed to clone repository after $max_retries attempts. Check internet connectivity:\n$git_output"
-  fi
-  
-  if [[ ! -d "$INSTALL_DIR" ]]; then
-    error_exit "Repository clone failed. Directory $INSTALL_DIR not created."
-  fi
-  
-  cd "$INSTALL_DIR" || error_exit "Failed to change to $INSTALL_DIR"
-  success "Repository cloned to $INSTALL_DIR"
-  
-  # Create .env
-  info "Configuring environment..."
-  local app_key=$(openssl rand -base64 32)
-  # Generate strong DB credentials: non-root application user and a separate root password
-  local db_app_user="billing"
-  local db_app_password
-  db_app_password=$(openssl rand -base64 18 | tr -dc 'A-Za-z0-9' | cut -c1-20)
-  local db_root_password
-  db_root_password=$(openssl rand -base64 18 | tr -dc 'A-Za-z0-9' | cut -c1-20)
+  }
 
-  cat > .env <<EOF
-APP_NAME="Billing Panel"
-APP_ENV=production
-APP_DEBUG=false
-APP_URL=https://$domain
-APP_KEY=$app_key
+  # Main menu logic
+  main() {
+    show_menu
+    case "$choice" in
+      1) install_billing_panel ;;
+      2) uninstall_billing_panel ;;
+      3) log "Exiting."; exit 0 ;;
+      *) log_error "Invalid choice: $choice"; exit 1 ;;
+    esac
+  }
 
-DB_CONNECTION=mysql
-DB_HOST=db
-DB_PORT=3306
-DB_DATABASE=billing
-DB_USERNAME=$db_app_user
-DB_PASSWORD=$db_app_password
-DB_ROOT_PASSWORD=$db_root_password
-
-QUEUE_CONNECTION=redis
-REDIS_HOST=redis
-REDIS_PORT=6379
-
-MAIL_MAILER=log
-EOF
-
-  success ".env file created (DB user: $db_app_user). Store DB_ROOT_PASSWORD securely."
-  success ".env file created"
-  
-  # Create Caddyfile (it's in .gitignore, so we generate it)
-  info "Generating web server configuration..."
-  cat > Caddyfile <<EOF
-# Caddy configuration for Billing-Panel
-$domain {
-	# Serve static files from public directory
-	root * /var/www/public
-
-	# Route PHP files to PHP-FPM
-	php_fastcgi app:9000 {
-		# Timeouts for long-running requests
-		timeout 300s
-		read_timeout 300s
-		write_timeout 300s
-	}
-
-	# Enable file serving
-	file_server
-
-	# Security headers
-	header {
-		X-Frame-Options "SAMEORIGIN"
-		X-Content-Type-Options "nosniff"
-		X-XSS-Protection "1; mode=block"
-		Referrer-Policy "strict-origin-when-cross-origin"
-		X-Permitted-Cross-Domain-Policies "none"
-	}
-
-	# Compression
-	encode gzip
-
-	# Handle 404s by routing to index.php (SPA/Laravel)
-	try_files {path} {path}/ /index.php?{query}
-
-	# Log errors
-	log {
-		output stdout
-		level debug
-	}
-}
-EOF
-  success "Web server configured"
-
-  # If Laravel app files (artisan) are missing, attempt to create a new Laravel project
-  if [[ ! -f "artisan" ]]; then
-    info "No Laravel application detected. Attempting to create a new Laravel project using Composer (this requires internet access)..."
-    if ! docker run --rm -v "$INSTALL_DIR":/app -w /app composer:2 create-project laravel/laravel /app --prefer-dist --no-interaction 2>&1; then
-      error_exit "Composer create-project failed or network unavailable. Aborting installation; please retry or run the installer with network access."
-    else
-      success "Laravel application scaffolded successfully"
-    fi
-  fi
-  
-  section "STARTING SERVICES"
-  
-  info "Building and starting containers (this may take 2-3 minutes)..."
-  if ! docker compose up -d --build 2>&1; then
-    error_exit "Docker compose failed to start containers. Run 'docker compose up' manually to inspect the error."
-  fi
-
-  # Verify the main app container is running
-  local app_container_id
-  app_container_id=$(docker ps --filter "name=billing-panel-app" --filter "status=running" -q | head -n1 || true)
-  if [[ -z "$app_container_id" ]]; then
-    error_exit "billing-panel-app container is not running. Check 'docker ps' and container logs: docker logs billing-panel-app"
-  fi
-  success "Docker containers started"
-
-  # Ensure PHP dependencies are installed inside the app container (if composer.json exists)
-  info "Ensuring PHP dependencies are installed in container..."
-  if docker exec -w /var/www billing-panel-app test -f composer.json >/dev/null 2>&1; then
-    if ! docker exec -w /var/www billing-panel-app composer install --no-dev --optimize-autoloader --no-interaction 2>&1; then
-      error_exit "Composer install failed inside container; aborting installation. Check container logs: docker logs billing-panel-app"
-    else
-      success "PHP dependencies installed"
-    fi
-  else
-    error_exit "No composer.json found in /var/www inside the container; the application is incomplete"
-  fi
-
-  # Set correct permissions for Laravel storage and cache
-  info "Setting filesystem permissions..."
-  if ! docker exec -w /var/www billing-panel-app sh -c "chown -R www-data:www-data storage bootstrap/cache"; then
-    error_exit "Failed to set ownership on storage or bootstrap/cache inside container"
-  fi
-  if ! docker exec -w /var/www billing-panel-app sh -c "chmod -R 775 storage bootstrap/cache"; then
-    error_exit "Failed to set permissions on storage or bootstrap/cache inside container"
-  fi
-  success "Filesystem permissions set"
-
-  # Generate application key if artisan exists
-  if docker exec -w /var/www billing-panel-app test -f artisan >/dev/null 2>&1; then
-    info "Generating application key..."
-    if ! docker exec -w /var/www billing-panel-app php artisan key:generate --force 2>&1; then
-      error_exit "artisan key:generate failed. Aborting. Check container logs: docker logs billing-panel-app"
-    fi
-  fi
-  
-  # Wait for database
-  info "Waiting for database..."
-  local max_attempts=30
-  local attempt=0
-  while [ $attempt -lt $max_attempts ]; do
-    if docker exec billing-panel-db mysql -u root -psecret -e "SELECT 1" > /dev/null 2>&1; then
-      success "Database ready"
-      break
-    fi
-    attempt=$((attempt + 1))
-    sleep 2
-    echo -n "."
-  done
-  echo ""
-  
-  [[ $attempt -eq $max_attempts ]] && error_exit "Database startup timeout"
-  
-  section "CONFIGURING DATABASE"
-  
-  info "Running migrations..."
-  # If the Laravel `artisan` file doesn't exist inside the container, skip migrations/seeding
-  if docker exec -w /var/www billing-panel-app test -f artisan >/dev/null 2>&1; then
-    if ! docker exec -w /var/www billing-panel-app php artisan migrate --force 2>&1; then
-      error_exit "Database migrations failed. Check container logs: docker logs billing-panel-app"
-    fi
-    success "Database migrations complete"
-
-    info "Seeding database with initial data..."
-    if ! docker exec -w /var/www billing-panel-app php artisan db:seed --force 2>&1; then
-      error_exit "Database seeding failed. Check container logs: docker logs billing-panel-app"
-    fi
-    success "Database seeded with initial data"
-  else
-    info "artisan not found in container at /var/www; skipping migrations and seeding"
-  fi
-  
-  # Success message
-  section "INSTALLATION COMPLETE"
-  echo ""
-  echo -e "${GREEN}✓ Billing-Panel is ready!${NC}"
-  echo ""
-  echo "  📍 Access: ${CYAN}https://$domain${NC}"
-  echo "  📧 Email:  admin@example.com"
+  main
   echo "  🔑 Password: password"
   echo ""
   echo "⚠️  IMPORTANT:"
