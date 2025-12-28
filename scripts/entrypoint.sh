@@ -7,23 +7,30 @@ fatal() { echo "[entrypoint][FATAL] $*" >&2; exit 1; }
 
 cd /var/www || fatal "Could not cd to /var/www"
 
-# Prepare directories
+
+# Prepare directories and set permissions, but never fatally exit for recoverable issues
 for dir in storage/logs storage/framework/views storage/framework/cache bootstrap/cache; do
-  mkdir -p "$dir" || fatal "Could not create $dir"
+  if ! mkdir -p "$dir"; then
+    log "Warning: Could not create $dir (may already exist or permission issue)"
+  fi
 done
 
-# Set permissions safely. Only chown when running as root, otherwise verify writability
+# Set permissions safely. Only chown when running as root, otherwise log warning
 if [ "$(id -u)" -eq 0 ]; then
-  chown -R app:app storage bootstrap/cache || fatal "chown failed"
+  if ! chown -R app:app storage bootstrap/cache; then
+    log "Warning: chown failed for storage/bootstrap/cache (may be bind mount or already correct)"
+  fi
 else
   # Verify directories are writable by the current user
   for dir in storage bootstrap/cache; do
     if [ ! -w "$dir" ]; then
-      fatal "Directory $dir is not writable by the container user (uid=$(id -u)). Ensure volume owner/permissions are correct." 
+      log "Warning: Directory $dir is not writable by the container user (uid=$(id -u)). App may fail if permissions are not correct."
     fi
   done
 fi
-chmod -R 775 storage bootstrap/cache || fatal "chmod failed"
+if ! chmod -R 775 storage bootstrap/cache; then
+  log "Warning: chmod failed for storage/bootstrap/cache (may be bind mount or already correct)"
+fi
 
 # Ensure .env exists
 if [ ! -f .env ]; then
@@ -31,14 +38,6 @@ if [ ! -f .env ]; then
   cp .env.example .env || fatal "Could not copy .env.example to .env"
 fi
 
-# Run composer install (no-scripts to avoid side effects)
-if [ ! -f vendor/autoload.php ]; then
-  log "Preparing environment for composer..."
-  git config --global --add safe.directory /var/www || log "git safe.directory config failed"
-  export COMPOSER_ALLOW_SUPERUSER=1
-  log "Running composer install..."
-  COMPOSER_ALLOW_SUPERUSER=1 composer install --no-interaction --no-scripts --optimize-autoloader || fatal "Composer install failed"
-fi
 
 # Generate APP_KEY if missing (without booting the framework to avoid provider side effects)
 if ! grep -q "^APP_KEY=" .env || grep -q "^APP_KEY=$" .env; then

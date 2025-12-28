@@ -28,9 +28,11 @@ RUN groupadd -g ${APP_GID} ${APP_USER} || true \
 
 WORKDIR /var/www
 
+
 # --- Build stage ---
 FROM base AS build
 WORKDIR /var/www
+# Only install composer dependencies at build time, never at runtime
 COPY composer.json composer.lock* ./
 RUN composer install --no-dev --prefer-dist --optimize-autoloader --no-interaction --no-scripts
 
