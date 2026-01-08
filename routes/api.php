@@ -4,8 +4,9 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Webhook\PaymentWebhookController;
 use App\Http\Controllers\Api\BillingController;
 
-// Payment webhooks (throttled)
-Route::post('webhooks/payment/{plugin}', [PaymentWebhookController::class, 'handle'])->middleware('throttle:webhooks');
+// Payment webhooks (strictly rate-limited)
+Route::post('webhooks/payment/{plugin}', [PaymentWebhookController::class, 'handle'])
+    ->middleware(['throttle:webhooks', 'signed']);
 
 // Healthcheck
 Route::get('health', function (\Illuminate\Http\Request $request) {
@@ -55,15 +56,15 @@ Route::get('health', function (\Illuminate\Http\Request $request) {
     return response()->json(['app' => 'ok', 'db' => $db, 'redis' => $redis, 'scheduler' => $scheduler_ok, 'queue' => $queue_ok]);
 })->middleware('throttle:health');
 
-// Billing API: requires authentication and rate limiting
-Route::middleware(['auth','throttle.api'])->group(function () {
-	Route::post('invoices/{invoice}/apply-promo', [BillingController::class, 'applyPromo']);
-	Route::get('users/{user}/wallet', [BillingController::class, 'wallet']);
+// Billing API: requires authentication and strict rate limiting
+Route::middleware(['auth', 'throttle:billing'])->group(function () {
+    Route::post('invoices/{invoice}/apply-promo', [BillingController::class, 'applyPromo']);
+    Route::get('users/{user}/wallet', [BillingController::class, 'wallet']);
 });
 
-// Admin billing actions
-Route::middleware(['auth', 'permission:manage-settings'])->prefix('admin')->group(function () {
-	Route::post('users/{user}/wallet/credit', [BillingController::class, 'creditWallet']);
-	Route::post('credit-notes', [BillingController::class, 'issueCredit']);
-	Route::post('invoices/{invoice}/pdf', [BillingController::class, 'invoicePdf']);
+// Admin billing actions (strict rate limiting)
+Route::middleware(['auth', 'permission:manage-settings', 'throttle:admin'])->prefix('admin')->group(function () {
+    Route::post('users/{user}/wallet/credit', [BillingController::class, 'creditWallet']);
+    Route::post('credit-notes', [BillingController::class, 'issueCredit']);
+    Route::post('invoices/{invoice}/pdf', [BillingController::class, 'invoicePdf']);
 });

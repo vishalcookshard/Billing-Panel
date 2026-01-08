@@ -13,15 +13,30 @@ use App\Services\Billing\InvoicePdfService;
 
 class BillingController extends Controller
 {
+
     public function applyPromo(Request $request, Invoice $invoice, PromoService $promoService)
     {
+        $this->authorize('update', $invoice);
         $request->validate(['code' => 'required|string']);
 
         $result = $promoService->applyPromoToInvoice($request->input('code'), $invoice);
 
         if (!$result['success']) {
+            \App\Models\Audit::log(auth()->id(), 'billing.promo.failed', [
+                'invoice_id' => $invoice->id,
+                'code' => $request->input('code'),
+                'actor_id' => auth()->id(),
+                'ip' => $request->ip(),
+            ]);
             return response()->json(['error' => $result['message'] ?? 'failed'], 422);
         }
+
+        \App\Models\Audit::log(auth()->id(), 'billing.promo.applied', [
+            'invoice_id' => $invoice->id,
+            'code' => $request->input('code'),
+            'actor_id' => auth()->id(),
+            'ip' => $request->ip(),
+        ]);
 
         return response()->json(['success' => true, 'discount' => $result['discount'], 'invoice_id' => $result['invoice_id']]);
     }

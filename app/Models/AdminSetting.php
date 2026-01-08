@@ -9,7 +9,8 @@ class AdminSetting extends Model
 {
     use HasFactory;
 
-    protected $fillable = ['key', 'value', 'encrypted'];
+    // Mass-assignment protection: never allow sensitive fields to be assigned
+    protected $guarded = ['id', 'key', 'encrypted'];
 
     public static function get($key, $default = null)
     {

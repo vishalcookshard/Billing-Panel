@@ -10,19 +10,18 @@ class Invoice extends Model
 {
     use HasFactory, SoftDeletes;
 
-    protected $fillable = [
+    // Mass-assignment protection: never allow sensitive fields to be assigned
+    protected $guarded = [
+        'id',
+        'status',
         'user_id',
         'amount',
-        'status',
-        'due_date',
-        'service_id',
-        'automation_status',
-        'grace_notified_at',
-        'last_status_at',
-        'paid_at',
-        'idempotency_key',
         'currency',
-        'provisioned_at',
+        'service_id',
+        'paid_at',
+        'created_at',
+        'updated_at',
+        'deleted_at',
     ];
 
     protected $casts = [

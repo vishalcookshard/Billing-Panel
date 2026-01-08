@@ -10,11 +10,13 @@ class SettingsController extends Controller
 {
     public function index()
     {
+        $this->authorize('manage-settings');
         return AdminSetting::all();
     }
 
     public function show($key)
     {
+        $this->authorize('manage-settings');
         return AdminSetting::where('key', $key)->firstOrFail();
     }
 
@@ -30,7 +32,19 @@ class SettingsController extends Controller
         $value = $validated['value'] ?? null;
         $encrypted = (bool)($validated['encrypted'] ?? false);
 
-        $setting = AdminSetting::updateOrCreate(['key' => $key], ['value' => $encrypted ? encrypt($value) : $value, 'encrypted' => $encrypted]);
+        $setting = AdminSetting::updateOrCreate([
+            'key' => $key
+        ], [
+            'value' => $encrypted ? encrypt($value) : $value,
+            'encrypted' => $encrypted
+        ]);
+
+        // Audit log
+        \App\Models\Audit::log(auth()->id(), 'admin.settings.update', [
+            'key' => $key,
+            'actor_id' => auth()->id(),
+            'ip' => $request->ip(),
+        ]);
 
         return $setting;
     }
